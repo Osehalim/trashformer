@@ -1,0 +1,299 @@
+# Trashformer Robot - Default Configuration
+# This file contains all default settings for the robot
+
+# ============================================================================
+# Robot Identity
+# ============================================================================
+robot:
+  name: "Trashformer"
+  version: "1.0.0"
+  description: "Autonomous trash collection robot"
+
+# ============================================================================
+# Hardware Configuration
+# ============================================================================
+hardware:
+  # Serial communication settings
+  serial_port: "/dev/ttyUSB0"
+  baud_rate: 115200
+  timeout: 1.0
+  
+  # I2C settings for PCA9685
+  i2c_bus: 1
+  i2c_address: 0x40  # Default PCA9685 address
+
+# ============================================================================
+# Arm Configuration
+# ============================================================================
+arm:
+  # PCA9685 PWM controller settings
+  pwm_frequency: 50  # 50Hz for servos
+  
+  # Servo channel assignments on PCA9685
+  servo_channels:
+    base: 0          # Base rotation servo
+    shoulder: 1      # Shoulder joint servo
+    elbow: 2         # Elbow joint servo
+    wrist: 3         # Wrist joint servo
+    gripper: 4       # Gripper servo
+  
+  # Servo angle limits (degrees)
+  angle_limits:
+    base:
+      min: 0
+      max: 180
+      home: 90
+    shoulder:
+      min: 0
+      max: 180
+      home: 90
+    elbow:
+      min: 0
+      max: 180
+      home: 90
+    wrist:
+      min: 0
+      max: 180
+      home: 90
+    gripper:
+      min: 0      # Open
+      max: 90     # Closed
+      home: 0
+  
+  # PWM pulse width limits (microseconds)
+  # These map angles to PWM values
+  pwm_limits:
+    min_pulse: 500    # Minimum pulse width (μs)
+    max_pulse: 2500   # Maximum pulse width (μs)
+  
+  # Movement settings
+  movement:
+    default_speed: 50       # Default servo speed (degrees/sec)
+    max_speed: 100          # Maximum servo speed (degrees/sec)
+    acceleration: 200       # Acceleration (degrees/sec²)
+    interpolation_steps: 20 # Steps for smooth movement
+  
+  # Physical dimensions (meters)
+  dimensions:
+    base_height: 0.05      # Height of base from ground
+    shoulder_length: 0.15  # Length of shoulder link
+    elbow_length: 0.12     # Length of elbow link
+    wrist_length: 0.08     # Length of wrist to gripper
+    gripper_length: 0.05   # Gripper depth
+  
+  # Safety limits
+  safety:
+    max_reach: 0.40        # Maximum reach distance (m)
+    min_height: -0.05      # Minimum height above base (m)
+    max_torque: 1.5        # Maximum torque (Nm) - if measurable
+
+# ============================================================================
+# Drive System Configuration
+# ============================================================================
+drive:
+  # Motor controller settings (Sabertooth)
+  motor_controller:
+    address: 128        # Sabertooth serial address
+    timeout: 100        # Command timeout (ms)
+  
+  # Physical parameters
+  wheel_diameter: 0.15   # meters
+  track_width: 0.30      # Distance between wheels (m)
+  
+  # Speed limits
+  max_linear_speed: 1.0  # m/s
+  max_angular_speed: 2.0 # rad/s
+  
+  # PID tuning for motor control
+  pid:
+    kp: 1.0
+    ki: 0.1
+    kd: 0.05
+
+# ============================================================================
+# Camera Configuration
+# ============================================================================
+camera:
+  device: 0              # Camera device index
+  width: 640
+  height: 480
+  fps: 30
+  
+  # Camera calibration (will be loaded from data/calibration/camera_params.json)
+  use_calibration: true
+  calibration_file: "data/calibration/camera_params.json"
+
+# ============================================================================
+# Vision Processing
+# ============================================================================
+vision:
+  # Object detection
+  detection:
+    model_path: "models/trash_detector.pth"
+    confidence_threshold: 0.7
+    nms_threshold: 0.4
+    input_size: [640, 640]
+  
+  # Segmentation
+  segmentation:
+    model_path: "models/segmentation_model.onnx"
+    enabled: false
+  
+  # Tracking
+  tracking:
+    max_age: 30          # Frames to keep lost tracks
+    min_hits: 3          # Minimum detections before confirmed
+    iou_threshold: 0.3   # IOU threshold for matching
+
+# ============================================================================
+# Sensor Configuration
+# ============================================================================
+sensors:
+  # IMU settings
+  imu:
+    enabled: true
+    update_rate: 100     # Hz
+    calibration_file: "data/calibration/imu_offsets.json"
+  
+  # Ultrasonic sensors
+  ultrasonic:
+    enabled: true
+    update_rate: 10      # Hz
+    max_range: 4.0       # meters
+    min_range: 0.02      # meters
+  
+  # Time-of-Flight sensors
+  tof:
+    enabled: false
+    update_rate: 20      # Hz
+  
+  # Limit switches
+  limit_switches:
+    enabled: true
+    debounce_time: 0.05  # seconds
+  
+  # Sensor fusion
+  fusion:
+    enabled: true
+    filter_type: "kalman"  # or "complementary"
+
+# ============================================================================
+# Safety System
+# ============================================================================
+safety:
+  # Emergency stop
+  emergency_stop:
+    enabled: true
+    pin: 17              # GPIO pin for E-stop button
+    active_low: true
+  
+  # Collision detection
+  collision:
+    enabled: true
+    stop_distance: 0.2   # meters
+    warning_distance: 0.5 # meters
+  
+  # Tilt detection
+  tilt:
+    max_angle: 30        # degrees
+    shutdown_angle: 45   # degrees - emergency shutdown
+  
+  # Watchdog
+  watchdog:
+    enabled: true
+    timeout: 5.0         # seconds
+    check_interval: 1.0  # seconds
+
+# ============================================================================
+# Behavior System
+# ============================================================================
+behavior:
+  # State machine
+  default_state: "idle"
+  
+  # Autonomous mode settings
+  autonomous:
+    search_pattern: "spiral"  # or "grid", "random"
+    pickup_distance: 0.3      # meters
+    approach_speed: 0.3       # m/s
+  
+  # Navigation
+  navigation:
+    goal_tolerance: 0.1       # meters
+    rotation_tolerance: 0.1   # radians
+    planning_rate: 10         # Hz
+
+# ============================================================================
+# Teleoperation
+# ============================================================================
+teleop:
+  # Keyboard control
+  keyboard:
+    enabled: true
+    linear_speed_step: 0.1   # m/s
+    angular_speed_step: 0.2  # rad/s
+  
+  # Gamepad control
+  gamepad:
+    enabled: true
+    device_index: 0
+    deadzone: 0.1
+    max_linear_speed: 0.8    # m/s
+    max_angular_speed: 1.5   # rad/s
+  
+  # Arm teleoperation
+  arm_control:
+    joint_step: 5            # degrees per button press
+    speed_multiplier: 1.0
+
+# ============================================================================
+# Logging Configuration
+# ============================================================================
+logging:
+  level: "INFO"              # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  console: true
+  file: true
+  log_directory: "logs"
+  
+  # Module-specific log levels
+  modules:
+    arm: "DEBUG"
+    vision: "INFO"
+    drive: "INFO"
+    sensors: "WARNING"
+
+# ============================================================================
+# Performance Tuning
+# ============================================================================
+performance:
+  # Update rates
+  main_loop_rate: 50         # Hz
+  sensor_loop_rate: 100      # Hz
+  vision_loop_rate: 30       # Hz
+  
+  # Threading
+  use_multithreading: true
+  thread_priorities:
+    safety: 10               # Highest
+    sensors: 8
+    control: 6
+    vision: 4
+    logging: 2               # Lowest
+
+# ============================================================================
+# Data Recording
+# ============================================================================
+recording:
+  enabled: false
+  directory: "data/recordings"
+  
+  # What to record
+  record:
+    sensor_data: true
+    camera_feed: false       # Can be large!
+    commands: true
+    state: true
+  
+  # Recording format
+  format: "csv"              # or "json", "hdf5"
+  compression: true
