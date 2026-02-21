@@ -23,45 +23,37 @@ hardware:
   i2c_address: 0x40  # Default PCA9685 address
 
 # ============================================================================
-# Arm Configuration
+# Arm Configuration (3-Servo Arm via PCA9685)
 # ============================================================================
 arm:
-  # PCA9685 PWM controller settings
+  # PWM frequency
   pwm_frequency: 50  # 50Hz for servos
   
-  # Servo channel assignments on PCA9685
+  # PCA9685 channel assignments
   servo_channels:
-    base: 0          # Base rotation servo
-    shoulder: 1      # Shoulder joint servo
-    elbow: 2         # Elbow joint servo
-    wrist: 3         # Wrist joint servo
-    gripper: 4       # Gripper servo
+    shoulder: 0      # Channel 0: Shoulder (vertical movement)
+    elbow: 1         # Channel 1: Elbow (horizontal movement)
+    gripper: 2       # Channel 2: Gripper (open/close)
   
   # Servo angle limits (degrees)
+  # Shoulder: Vertical movement (0° down/neutral, 90° horizontal, 180° up)
+  # Elbow: Horizontal rotation - LEFT ARM (0° center/neutral, rotates RIGHT to 180°)
+  # Gripper: Open/close (0° open, 90° closed)
   angle_limits:
-    base:
-      min: 0
-      max: 180
-      home: 90
     shoulder:
-      min: 0
-      max: 180
-      home: 90
+      min: 0          # Full down
+      max: 180        # Full up
+      home: 0         # Down (neutral/rest position)
     elbow:
-      min: 0
-      max: 180
-      home: 90
-    wrist:
-      min: 0
-      max: 180
-      home: 90
+      min: 0          # Center/straight
+      max: 180        # Fully turned right
+      home: 0         # Center (neutral - only rotates RIGHT from here)
     gripper:
-      min: 0      # Open
-      max: 90     # Closed
-      home: 0
+      min: 0          # Open
+      max: 90         # Closed
+      home: 0         # Open (neutral)
   
   # PWM pulse width limits (microseconds)
-  # These map angles to PWM values
   pwm_limits:
     min_pulse: 500    # Minimum pulse width (μs)
     max_pulse: 2500   # Maximum pulse width (μs)
@@ -70,22 +62,18 @@ arm:
   movement:
     default_speed: 50       # Default servo speed (degrees/sec)
     max_speed: 100          # Maximum servo speed (degrees/sec)
-    acceleration: 200       # Acceleration (degrees/sec²)
-    interpolation_steps: 20 # Steps for smooth movement
+    smooth_steps: 10        # Steps per second for smooth movement
   
-  # Physical dimensions (meters)
+  # Physical dimensions (meters) - approximate
   dimensions:
-    base_height: 0.05      # Height of base from ground
-    shoulder_length: 0.15  # Length of shoulder link
-    elbow_length: 0.12     # Length of elbow link
-    wrist_length: 0.08     # Length of wrist to gripper
-    gripper_length: 0.05   # Gripper depth
+    shoulder_length: 0.15   # Length from shoulder to elbow pivot
+    forearm_length: 0.12    # Length from elbow to gripper
+    gripper_length: 0.05    # Gripper depth
   
   # Safety limits
   safety:
-    max_reach: 0.40        # Maximum reach distance (m)
-    min_height: -0.05      # Minimum height above base (m)
-    max_torque: 1.5        # Maximum torque (Nm) - if measurable
+    max_reach: 0.30         # Maximum reach distance (m)
+    min_ground_clearance: 0.05  # Minimum clearance from ground
 
 # ============================================================================
 # Drive System Configuration
