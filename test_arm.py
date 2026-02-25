@@ -3,7 +3,7 @@
 Test script for Trashformer arm - works in simulation mode
 """
 
-from arm.arm_controller_final import ArmController
+from arm.arm_controller import ArmController
 from utils.config_loader import load_config
 import time
 
