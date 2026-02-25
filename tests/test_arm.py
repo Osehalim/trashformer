@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from arm.arm_controller_final import ArmController
+from arm.arm_controller import ArmController
 from utils.config_loader import load_config
 import time
 
