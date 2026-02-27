@@ -31,68 +31,64 @@ arm:
   
   # PCA9685 channel assignments
   servo_channels:
-    shoulder: 0      # Channel 0: Shoulder (vertical movement)
-    elbow: 1         # Channel 1: Elbow (horizontal movement)
-    gripper: 2       # Channel 2: Gripper (open/close)
+    shoulder: 0
+    elbow: 1
+    gripper: 2
   
   # Servo angle limits (degrees)
-  # Shoulder: Vertical movement (0° down/neutral, 90° horizontal, 180° up)
-  # Elbow: Horizontal rotation - LEFT ARM (0° center/neutral, rotates RIGHT to 180°)
-  # Gripper: Open/close (0° open, 90° closed)
+  # Shoulder: 0° down, 90° horizontal, 180° up
+  # Elbow:    0° center/straight, rotates RIGHT to 90° (LIMITED)
+  # Gripper:  0° open, 90° closed
   angle_limits:
     shoulder:
-      min: 0          # Full down
-      max: 180        # Full up
-      home: 0         # Down (neutral/rest position)
+      min: 0
+      max: 180
+      home: 0
     elbow:
-      min: 0          # Center/straight
-      max: 180        # Fully turned right
-      home: 0         # Center (neutral - only rotates RIGHT from here)
+      min: 0
+      max: 90        # ← LIMITED to prevent over-rotation
+      home: 0
     gripper:
-      min: 0          # Open
-      max: 90         # Closed
-      home: 0         # Open (neutral)
+      min: 0
+      max: 90
+      home: 0
   
   # PWM pulse width limits (microseconds)
   pwm_limits:
-    min_pulse: 500    # Minimum pulse width (μs)
-    max_pulse: 2500   # Maximum pulse width (μs)
+    min_pulse: 500
+    max_pulse: 2500
   
   # Movement settings
   movement:
-    default_speed: 50       # Default servo speed (degrees/sec)
-    max_speed: 100          # Maximum servo speed (degrees/sec)
-    smooth_steps: 10        # Steps per second for smooth movement
+    default_speed: 50
+    max_speed: 100
+    smooth_steps: 10
   
-  # Physical dimensions (meters) - approximate
+  # Physical dimensions (meters)
   dimensions:
-    shoulder_length: 0.15   # Length from shoulder to elbow pivot
-    forearm_length: 0.12    # Length from elbow to gripper
-    gripper_length: 0.05    # Gripper depth
+    shoulder_length: 0.15
+    forearm_length: 0.12
+    gripper_length: 0.05
   
   # Safety limits
   safety:
-    max_reach: 0.30         # Maximum reach distance (m)
-    min_ground_clearance: 0.05  # Minimum clearance from ground
+    max_reach: 0.30
+    min_ground_clearance: 0.05
 
 # ============================================================================
 # Drive System Configuration
 # ============================================================================
 drive:
-  # Motor controller settings (Sabertooth)
   motor_controller:
-    address: 128        # Sabertooth serial address
-    timeout: 100        # Command timeout (ms)
+    address: 128
+    timeout: 100
   
-  # Physical parameters
-  wheel_diameter: 0.15   # meters
-  track_width: 0.30      # Distance between wheels (m)
+  wheel_diameter: 0.15
+  track_width: 0.30
   
-  # Speed limits
-  max_linear_speed: 1.0  # m/s
-  max_angular_speed: 2.0 # rad/s
+  max_linear_speed: 1.0
+  max_angular_speed: 2.0
   
-  # PID tuning for motor control
   pid:
     kp: 1.0
     ki: 0.1
@@ -102,12 +98,11 @@ drive:
 # Camera Configuration
 # ============================================================================
 camera:
-  device: 0              # Camera device index
+  device: 0
   width: 640
   height: 480
   fps: 30
   
-  # Camera calibration (will be loaded from data/calibration/camera_params.json)
   use_calibration: true
   calibration_file: "data/calibration/camera_params.json"
 
@@ -115,135 +110,116 @@ camera:
 # Vision Processing
 # ============================================================================
 vision:
-  # Object detection
   detection:
     model_path: "models/trash_detector.pth"
     confidence_threshold: 0.7
     nms_threshold: 0.4
     input_size: [640, 640]
   
-  # Segmentation
   segmentation:
     model_path: "models/segmentation_model.onnx"
     enabled: false
   
-  # Tracking
   tracking:
-    max_age: 30          # Frames to keep lost tracks
-    min_hits: 3          # Minimum detections before confirmed
-    iou_threshold: 0.3   # IOU threshold for matching
+    max_age: 30
+    min_hits: 3
+    iou_threshold: 0.3
 
 # ============================================================================
 # Sensor Configuration
 # ============================================================================
 sensors:
-  # IMU settings
   imu:
     enabled: true
-    update_rate: 100     # Hz
+    update_rate: 100
     calibration_file: "data/calibration/imu_offsets.json"
   
-  # Ultrasonic sensors
   ultrasonic:
     enabled: true
-    update_rate: 10      # Hz
-    max_range: 4.0       # meters
-    min_range: 0.02      # meters
+    update_rate: 10
+    max_range: 4.0
+    min_range: 0.02
   
-  # Time-of-Flight sensors
   tof:
     enabled: false
-    update_rate: 20      # Hz
+    update_rate: 20
   
-  # Limit switches
   limit_switches:
     enabled: true
-    debounce_time: 0.05  # seconds
+    debounce_time: 0.05
   
-  # Sensor fusion
   fusion:
     enabled: true
-    filter_type: "kalman"  # or "complementary"
+    filter_type: "kalman"
 
 # ============================================================================
 # Safety System
 # ============================================================================
 safety:
-  # Emergency stop
   emergency_stop:
     enabled: true
-    pin: 17              # GPIO pin for E-stop button
+    pin: 17
     active_low: true
   
-  # Collision detection
   collision:
     enabled: true
-    stop_distance: 0.2   # meters
-    warning_distance: 0.5 # meters
+    stop_distance: 0.2
+    warning_distance: 0.5
   
-  # Tilt detection
   tilt:
-    max_angle: 30        # degrees
-    shutdown_angle: 45   # degrees - emergency shutdown
+    max_angle: 30
+    shutdown_angle: 45
   
-  # Watchdog
   watchdog:
     enabled: true
-    timeout: 5.0         # seconds
-    check_interval: 1.0  # seconds
+    timeout: 5.0
+    check_interval: 1.0
 
 # ============================================================================
 # Behavior System
 # ============================================================================
 behavior:
-  # State machine
   default_state: "idle"
   
-  # Autonomous mode settings
   autonomous:
-    search_pattern: "spiral"  # or "grid", "random"
-    pickup_distance: 0.3      # meters
-    approach_speed: 0.3       # m/s
+    search_pattern: "spiral"
+    pickup_distance: 0.3
+    approach_speed: 0.3
   
-  # Navigation
   navigation:
-    goal_tolerance: 0.1       # meters
-    rotation_tolerance: 0.1   # radians
-    planning_rate: 10         # Hz
+    goal_tolerance: 0.1
+    rotation_tolerance: 0.1
+    planning_rate: 10
 
 # ============================================================================
 # Teleoperation
 # ============================================================================
 teleop:
-  # Keyboard control
   keyboard:
     enabled: true
-    linear_speed_step: 0.1   # m/s
-    angular_speed_step: 0.2  # rad/s
+    linear_speed_step: 0.1
+    angular_speed_step: 0.2
   
-  # Gamepad control
   gamepad:
     enabled: true
     device_index: 0
     deadzone: 0.1
-    max_linear_speed: 0.8    # m/s
-    max_angular_speed: 1.5   # rad/s
+    max_linear_speed: 0.8
+    max_angular_speed: 1.5
   
-  # Arm teleoperation
   arm_control:
-    joint_step: 5            # degrees per button press
+    joint_step: 5
     speed_multiplier: 1.0
 
 # ============================================================================
 # Logging Configuration
 # ============================================================================
 logging:
-  level: "INFO"              # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: "INFO"
   console: true
   file: true
   log_directory: "logs"
   
-  # Module-specific log levels
   modules:
     arm: "DEBUG"
     vision: "INFO"
@@ -254,19 +230,17 @@ logging:
 # Performance Tuning
 # ============================================================================
 performance:
-  # Update rates
-  main_loop_rate: 50         # Hz
-  sensor_loop_rate: 100      # Hz
-  vision_loop_rate: 30       # Hz
+  main_loop_rate: 50
+  sensor_loop_rate: 100
+  vision_loop_rate: 30
   
-  # Threading
   use_multithreading: true
   thread_priorities:
-    safety: 10               # Highest
+    safety: 10
     sensors: 8
     control: 6
     vision: 4
-    logging: 2               # Lowest
+    logging: 2
 
 # ============================================================================
 # Data Recording
@@ -275,13 +249,11 @@ recording:
   enabled: false
   directory: "data/recordings"
   
-  # What to record
   record:
     sensor_data: true
-    camera_feed: false       # Can be large!
+    camera_feed: false
     commands: true
     state: true
   
-  # Recording format
-  format: "csv"              # or "json", "hdf5"
+  format: "csv"
   compression: true

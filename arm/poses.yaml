@@ -1,164 +1,110 @@
-# Arm Poses for 3-Servo LEFT ARM
-# 
-# Servo configuration:
-# - Shoulder: Vertical movement (0° down/neutral, 90° horizontal, 180° up)
-# - Elbow: Horizontal rotation - LEFT ARM only rotates RIGHT
-#          (0° center/straight, 90° turned right, 180° fully right)
-# - Gripper: 0° open, 90° closed
+# Arm Poses for 3-Servo LEFT ARM (consistent with default.yaml)
 #
-# All angles in degrees
+# Conventions:
+# - Shoulder: 0° down, 90° horizontal, 180° up
+# - Elbow:    0° = center/straight, rotates RIGHT to 90° (MAX)
+# - Gripper:  0° open, 90° closed
 
 # ============================================================================
 # Basic Positions
 # ============================================================================
 
-# Home position - safe neutral position (arm down, centered, gripper open)
 home:
-  shoulder: 0     # Down (neutral)
-  elbow: 0        # Center/straight
-  gripper: 0      # Open
+  shoulder: 0
+  elbow: 0
+  gripper: 0
 
-# Rest position - compact for storage (arm down and centered)
 rest:
-  shoulder: 0     # Down
-  elbow: 0        # Center
-  gripper: 0      # Open
+  shoulder: 0
+  elbow: 0
+  gripper: 0
 
-# Ready position - prepared for action (arm horizontal, ready to grab)
 ready:
-  shoulder: 90    # Horizontal
-  elbow: 0        # Center/straight
-  gripper: 0      # Open
+  shoulder: 90
+  elbow: 0
+  gripper: 0
 
-# Neutral - all servos at neutral/rest position
 neutral:
-  shoulder: 0     # Down
-  elbow: 0        # Center
-  gripper: 0      # Open
+  shoulder: 0
+  elbow: 0
+  gripper: 0
 
 # ============================================================================
 # Pickup Positions
 # ============================================================================
 
-# Pickup from ground (arm down, elbow center)
 pickup_ground:
-  shoulder: 30    # Slightly raised from down
-  elbow: 0        # Center/straight
-  gripper: 0      # Open
+  shoulder: 30
+  elbow: 0
+  gripper: 0
 
-# Pickup from ground - elbow turned right for offset pickup
 pickup_ground_right:
   shoulder: 30
-  elbow: 45       # Turned slightly right
+  elbow: 45
   gripper: 0
 
-# Pickup at table height (arm horizontal)
 pickup_table:
-  shoulder: 90    # Horizontal
-  elbow: 0        # Center
+  shoulder: 90
+  elbow: 0
   gripper: 0
 
-# Pickup elevated (arm angled up)
 pickup_elevated:
-  shoulder: 120   # Angled up
-  elbow: 0        # Center
+  shoulder: 120
+  elbow: 0
   gripper: 0
 
 # ============================================================================
-# Holding/Transport Positions
+# Holding/Transport
 # ============================================================================
 
-# Holding object - centered
 hold_center:
   shoulder: 90
-  elbow: 90
-  gripper: 90     # Closed
+  elbow: 0
+  gripper: 90
 
-# Holding - retracted/safe
 hold_retracted:
   shoulder: 60
-  elbow: 90
-  gripper: 90     # Closed
+  elbow: 45
+  gripper: 90
 
-# Transport position - elevated for clearance
 transport:
-  shoulder: 120   # Raised
-  elbow: 90
-  gripper: 90     # Holding
+  shoulder: 120
+  elbow: 45
+  gripper: 90
 
 # ============================================================================
-# Drop/Release Positions (Elbow rotates RIGHT to drop into bin)
+# Drop/Release (right side)
 # ============================================================================
 
-# Drop into bin - high position, turned right
 drop_high:
-  shoulder: 150   # Very high
-  elbow: 90       # Turned right toward bin
-  gripper: 0      # Open to release
+  shoulder: 150
+  elbow: 90
+  gripper: 0
 
-# Drop at medium height, turned right
 drop_medium:
   shoulder: 110
-  elbow: 90       # Turned right
+  elbow: 90
   gripper: 0
 
-# Drop at low height, turned right
 drop_low:
   shoulder: 50
-  elbow: 90       # Turned right
+  elbow: 90
   gripper: 0
 
-# Drop with elbow only slightly turned
 drop_slight_right:
   shoulder: 100
-  elbow: 45       # Slightly right
+  elbow: 45
   gripper: 0
 
-# Drop with elbow fully turned right
 drop_full_right:
   shoulder: 100
-  elbow: 180      # Fully right
+  elbow: 90      # ← FIXED: Was 180, now 90 (max)
   gripper: 0
 
 # ============================================================================
-# Directional Positions
+# Gripper-only partial poses
 # ============================================================================
 
-# Point/reach up
-reach_up:
-  shoulder: 180   # Full up
-  elbow: 90
-  gripper: 0
-
-# Point/reach down
-reach_down:
-  shoulder: 0     # Full down
-  elbow: 90
-  gripper: 0
-
-# Reach left
-reach_left:
-  shoulder: 90
-  elbow: 0        # Full left
-  gripper: 0
-
-# Reach right
-reach_right:
-  shoulder: 90
-  elbow: 180      # Full right
-  gripper: 0
-
-# Reach forward (horizontal, center)
-reach_forward:
-  shoulder: 90
-  elbow: 90
-  gripper: 0
-
-# ============================================================================
-# Gripper States (maintaining current arm position)
-# ============================================================================
-
-# These are partial poses - only affect gripper
 gripper_open:
   gripper: 0
 
@@ -166,165 +112,132 @@ gripper_closed:
   gripper: 90
 
 gripper_partial:
-  gripper: 45     # Half-grip
+  gripper: 45
 
 # ============================================================================
-# Safety Positions
+# Safety
 # ============================================================================
 
-# Emergency position - safe retracted
 emergency:
-  shoulder: 60    # Slightly lowered
-  elbow: 90       # Centered
-  gripper: 0      # Open (release anything)
+  shoulder: 60
+  elbow: 45
+  gripper: 0
 
-# Tuck - minimal footprint
 tuck:
-  shoulder: 20    # Very low
-  elbow: 90
+  shoulder: 20
+  elbow: 45
   gripper: 0
 
 # ============================================================================
-# Calibration Positions
+# Calibration
 # ============================================================================
 
-# All at minimum
 calibrate_min:
   shoulder: 0
   elbow: 0
   gripper: 0
 
-# All at center
 calibrate_center:
   shoulder: 90
-  elbow: 90
+  elbow: 45      # ← FIXED: Midpoint between 0 and 90
   gripper: 45
 
-# All at maximum
 calibrate_max:
   shoulder: 180
-  elbow: 180
+  elbow: 90      # ← FIXED: Was 180, now 90 (max)
   gripper: 90
 
 # ============================================================================
-# Trash Collection Sequence Positions
+# Simple demo
 # ============================================================================
 
-# Sequence: Pickup trash from ground and drop in bin
-
-# Step 1: Approach position (arm extended down, gripper open)
-approach_trash:
-  shoulder: 40    # Low
-  elbow: 90       # Center
-  gripper: 0      # Open
-
-# Step 2: Grab trash (close gripper)
-grab_trash:
-  shoulder: 40
-  elbow: 90
-  gripper: 90     # Closed
-
-# Step 3: Lift trash up
-lift_trash:
-  shoulder: 100   # Raise up
-  elbow: 90
-  gripper: 90     # Holding
-
-# Step 4: Transport to bin (move higher for clearance)
-transport_to_bin:
-  shoulder: 140   # High
-  elbow: 90
-  gripper: 90     # Still holding
-
-# Step 5: Position over bin
-over_bin:
-  shoulder: 140
-  elbow: 90       # Adjust left/right as needed
-  gripper: 90
-
-# Step 6: Release trash
-release_trash:
-  shoulder: 140
-  elbow: 90
-  gripper: 0      # Open to drop
-
-# ============================================================================
-# Fun/Demo Positions
-# ============================================================================
-
-# Wave - move elbow back and forth
 wave_start:
-  shoulder: 120   # Raised
-  elbow: 90
-  gripper: 0
-
-wave_left:
   shoulder: 120
   elbow: 60
   gripper: 0
 
 wave_right:
   shoulder: 120
-  elbow: 120
+  elbow: 90      # ← FIXED: Was 120, now 90 (max)
   gripper: 0
 
-# Nod - move shoulder up and down
 nod_up:
   shoulder: 110
-  elbow: 90
+  elbow: 45
   gripper: 0
 
 nod_down:
   shoulder: 70
-  elbow: 90
-  gripper: 0
-
-# Point straight ahead
-point_forward:
-  shoulder: 90
-  elbow: 90
+  elbow: 45
   gripper: 0
 
 # ============================================================================
-# Inspection Positions
+# Trash Collection Sequence
 # ============================================================================
 
-# Inspect object (bring to view)
-inspect:
-  shoulder: 110   # Raised to camera level
-  elbow: 90
-  gripper: 45     # Gentle hold
+approach_trash:
+  shoulder: 40
+  elbow: 0
+  gripper: 0
 
-# Show object (present to user)
-show:
+grab_trash:
+  shoulder: 40
+  elbow: 0
+  gripper: 90
+
+lift_trash:
   shoulder: 100
+  elbow: 0
+  gripper: 90
+
+transport_to_bin:
+  shoulder: 140
+  elbow: 60
+  gripper: 90
+
+over_bin:
+  shoulder: 140
+  elbow: 90      # Turned right over bin
+  gripper: 90
+
+release_trash:
+  shoulder: 140
   elbow: 90
+  gripper: 0
+
+# ============================================================================
+# Additional useful poses
+# ============================================================================
+
+# Inspection - bring object to center for viewing
+inspect:
+  shoulder: 110
+  elbow: 0
   gripper: 45
 
-# ============================================================================
-# Compound Movement Helpers
-# ============================================================================
+# Show - present object
+show:
+  shoulder: 100
+  elbow: 0
+  gripper: 45
 
-# Pre-pickup position (before lowering to grab)
-pre_pickup:
-  shoulder: 90    # Start horizontal
-  elbow: 90
-  gripper: 0      # Open
+# Reach positions
+reach_forward:
+  shoulder: 90
+  elbow: 0
+  gripper: 0
 
-# Post-pickup position (after lifting, before moving)
-post_pickup:
-  shoulder: 110   # Raised
-  elbow: 90
-  gripper: 90     # Holding
+reach_up:
+  shoulder: 180
+  elbow: 0
+  gripper: 0
 
-# Pre-drop position (before releasing)
-pre_drop:
-  shoulder: 120
-  elbow: 90
-  gripper: 90     # Still holding
+reach_down:
+  shoulder: 0
+  elbow: 0
+  gripper: 0
 
-# Post-drop position (after releasing)
-post_drop:
-  shoulder: 120
-  elbow: 90
-  gripper: 0      # Released
+reach_right:
+  shoulder: 90
+  elbow: 90      # Fully right
+  gripper: 0

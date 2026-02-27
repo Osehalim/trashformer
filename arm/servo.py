@@ -1,13 +1,14 @@
 """
-Servo control for 3-servo arm via PCA9685.
+Servo control via PCA9685.
 
-Direct control from Raspberry Pi - no Arduino needed!
-
-Manages three servos:
-- Shoulder: Vertical movement (up/down) - 0° to 180°
-- Elbow: Horizontal movement (left/right) - 0° to 180° (90° is neutral)
-- Gripper: Open/close - 0° (open) to 90° (closed)
+Provides:
+- angle limits
+- pulse mapping
+- optional invert/offset calibration
+- smooth movement
 """
+
+from __future__ import annotations
 
 import time
 from typing import Optional
@@ -16,182 +17,174 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+def _clamp(x: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, x))
+
+
 class Servo:
     """
     Individual servo controller via PCA9685.
-    
-    Provides angle tracking, limits, and smooth movement control.
+
+    Notes:
+    - Angles are logical angles (degrees) you define for the robot.
+    - Use invert + offset to fix physical mounting differences.
     """
-    
-    def __init__(self,
-                 pwm_controller,
-                 channel: int,
-                 name: str,
-                 min_angle: float = 0,
-                 max_angle: float = 180,
-                 min_pulse: int = 500,
-                 max_pulse: int = 2500,
-                 home_angle: float = 90,
-                 neutral_angle: float = 90):
-        """
-        Initialize a servo.
-        
-        Args:
-            pwm_controller: PCA9685 instance
-            channel: PWM channel (0-15)
-            name: Servo name ('shoulder', 'elbow', or 'gripper')
-            min_angle: Minimum allowed angle (degrees)
-            max_angle: Maximum allowed angle (degrees)
-            min_pulse: PWM pulse width at min_angle (microseconds)
-            max_pulse: PWM pulse width at max_angle (microseconds)
-            home_angle: Default "home" position
-            neutral_angle: Neutral/rest position
-        """
+
+    def __init__(
+        self,
+        pwm_controller,
+        channel: int,
+        name: str,
+        min_angle: float = 0.0,
+        max_angle: float = 180.0,
+        min_pulse: int = 500,
+        max_pulse: int = 2500,
+        home_angle: float = 90.0,
+        neutral_angle: float = 90.0,
+        invert: bool = False,
+        offset_deg: float = 0.0,
+        smooth_hz: float = 10.0,  # updates/sec when smoothing
+    ):
         self.pwm = pwm_controller
-        self.channel = channel
+        self.channel = int(channel)
         self.name = name.lower()
-        
-        # Angle limits
-        self.min_angle = min_angle
-        self.max_angle = max_angle
-        self.home_angle = home_angle
-        self.neutral_angle = neutral_angle
-        
-        # PWM limits
-        self.min_pulse = min_pulse
-        self.max_pulse = max_pulse
-        
-        # Current state
+
+        self.min_angle = float(min_angle)
+        self.max_angle = float(max_angle)
+        self.home_angle = float(home_angle)
+        self.neutral_angle = float(neutral_angle)
+
+        self.min_pulse = int(min_pulse)
+        self.max_pulse = int(max_pulse)
+
+        self.invert = bool(invert)
+        self.offset_deg = float(offset_deg)
+        self.smooth_hz = float(smooth_hz)
+
         self._current_angle: Optional[float] = None
         self._target_angle: Optional[float] = None
-        
-        logger.info(f"Initialized {name} servo on channel {channel} "
-                   f"(range: {min_angle}°-{max_angle}°, home: {home_angle}°)")
-    
-    def _angle_to_pulse(self, angle: float) -> int:
-        """Convert angle to PWM pulse width."""
-        # Linear interpolation
-        angle_range = self.max_angle - self.min_angle
-        pulse_range = self.max_pulse - self.min_pulse
-        
-        normalized = (angle - self.min_angle) / angle_range
-        pulse = self.min_pulse + (normalized * pulse_range)
-        
-        return int(pulse)
-    
+
+        logger.info(
+            f"Initialized {self.name} servo on channel {self.channel} "
+            f"(angle range: {self.min_angle}°-{self.max_angle}°, home: {self.home_angle}°)"
+        )
+
     def _clamp_angle(self, angle: float) -> float:
-        """Clamp angle to valid range."""
-        if angle < self.min_angle:
-            logger.warning(f"{self.name}: Angle {angle}° below minimum {self.min_angle}°, clamping")
+        a = float(angle)
+        if a < self.min_angle:
+            logger.warning(f"{self.name}: angle {a}° below min {self.min_angle}°, clamping")
             return self.min_angle
-        if angle > self.max_angle:
-            logger.warning(f"{self.name}: Angle {angle}° above maximum {self.max_angle}°, clamping")
+        if a > self.max_angle:
+            logger.warning(f"{self.name}: angle {a}° above max {self.max_angle}°, clamping")
             return self.max_angle
-        return angle
-    
+        return a
+
+    def _apply_calibration(self, angle: float) -> float:
+        """
+        Apply offset/invert to logical angle before mapping to pulse.
+        This lets you keep poses stable even if a servo is mounted flipped.
+        """
+        a = float(angle) + self.offset_deg
+        if self.invert:
+            # mirror within [min_angle, max_angle]
+            a = self.max_angle - (a - self.min_angle)
+        return a
+
+    def _angle_to_pulse(self, angle: float) -> int:
+        # Prevent bad config divide-by-zero
+        if self.max_angle == self.min_angle:
+            logger.warning(f"{self.name}: max_angle == min_angle; defaulting to midpoint pulse")
+            return int(round((self.min_pulse + self.max_pulse) / 2))
+
+        # Normalize to 0..1
+        ratio = (angle - self.min_angle) / (self.max_angle - self.min_angle)
+        ratio = _clamp(ratio, 0.0, 1.0)
+        pulse = self.min_pulse + ratio * (self.max_pulse - self.min_pulse)
+        pulse_i = int(round(pulse))
+
+        # Final pulse clamp
+        if pulse_i < self.min_pulse:
+            pulse_i = self.min_pulse
+        if pulse_i > self.max_pulse:
+            pulse_i = self.max_pulse
+        return pulse_i
+
     def set_angle(self, angle: float, validate: bool = True) -> bool:
         """
         Set servo to specific angle immediately.
-        
-        Args:
-            angle: Target angle in degrees
-            validate: Apply safety limits
-            
-        Returns:
-            True if successful
         """
+        a = float(angle)
         if validate:
-            angle = self._clamp_angle(angle)
-        
-        # Convert to pulse width
-        pulse = self._angle_to_pulse(angle)
-        
-        # Send to PCA9685
+            a = self._clamp_angle(a)
+
+        calibrated = self._apply_calibration(a)
+        pulse = self._angle_to_pulse(calibrated)
+
         self.pwm.set_pulse_width(self.channel, pulse)
-        
-        # Update state
-        self._current_angle = angle
-        self._target_angle = angle
-        
-        logger.debug(f"{self.name}: Set to {angle}° (pulse: {pulse}μs)")
+
+        self._current_angle = a
+        self._target_angle = a
+
+        logger.debug(f"{self.name}: set {a}° (cal={calibrated}° -> {pulse}us)")
         return True
-    
+
     def move_to(self, angle: float, speed: Optional[float] = None, blocking: bool = True) -> bool:
         """
-        Move servo to angle with optional speed control.
-        
-        Args:
-            angle: Target angle
-            speed: Movement speed in degrees/second (None = instant)
-            blocking: Wait for movement to complete
-            
-        Returns:
-            True if successful
+        Move servo to angle with optional smoothing.
+        speed: degrees/second. None => instant.
         """
-        angle = self._clamp_angle(angle)
-        
+        target = self._clamp_angle(float(angle))
+
+        # Instant if no speed or unknown current
         if speed is None or self._current_angle is None:
-            # Instant movement
-            return self.set_angle(angle)
-        
-        # Calculate smooth movement
-        start_angle = self._current_angle
-        delta = angle - start_angle
-        
-        if abs(delta) < 1:  # Already there
+            return self.set_angle(target, validate=False)
+
+        start = float(self._current_angle)
+        delta = target - start
+        if abs(delta) < 0.5:
+            self._target_angle = target
             return True
-        
+
+        speed = max(1e-6, float(speed))
         move_time = abs(delta) / speed
-        steps = max(int(move_time * 10), 1)  # 10 updates per second
+
+        steps = max(int(move_time * self.smooth_hz), 1)
         step_delay = move_time / steps
-        
-        logger.debug(f"{self.name}: Moving from {start_angle}° to {angle}° "
-                    f"at {speed}°/s ({move_time:.2f}s)")
-        
-        # Execute movement
+
+        logger.debug(
+            f"{self.name}: moving {start}° -> {target}° at {speed}°/s "
+            f"({move_time:.2f}s, {steps} steps)"
+        )
+
         for i in range(steps + 1):
-            progress = i / steps
-            current = start_angle + (delta * progress)
-            
-            if not self.set_angle(current, validate=False):
-                return False
-            
+            t = i / steps
+            a = start + delta * t
+            self.set_angle(a, validate=False)
             if blocking and i < steps:
                 time.sleep(step_delay)
-        
-        self._target_angle = angle
+
+        self._current_angle = target
+        self._target_angle = target
         return True
-    
+
     def home(self, speed: Optional[float] = None, blocking: bool = True) -> bool:
-        """Move to home position."""
-        logger.info(f"{self.name}: Moving to home position ({self.home_angle}°)")
         return self.move_to(self.home_angle, speed, blocking)
-    
+
     def neutral(self, speed: Optional[float] = None, blocking: bool = True) -> bool:
-        """Move to neutral position."""
-        logger.info(f"{self.name}: Moving to neutral position ({self.neutral_angle}°)")
         return self.move_to(self.neutral_angle, speed, blocking)
-    
+
     def get_angle(self) -> Optional[float]:
-        """Get current servo angle."""
         return self._current_angle
-    
-    def get_target_angle(self) -> Optional[float]:
-        """Get target servo angle."""
-        return self._target_angle
-    
-    def is_moving(self) -> bool:
-        """Check if servo is moving."""
-        if self._current_angle is None or self._target_angle is None:
-            return False
-        return abs(self._current_angle - self._target_angle) > 1
-    
-    def disable(self):
-        """Disable servo (stop PWM signal)."""
-        logger.info(f"{self.name}: Disabling")
-        self.pwm.set_pwm(self.channel, 0, 0)
-    
-    def __repr__(self):
-        """String representation."""
-        return (f"Servo(name='{self.name}', channel={self.channel}, "
-                f"current={self._current_angle}°, range={self.min_angle}°-{self.max_angle}°)")
+
+    def disable(self) -> None:
+        """
+        Disable servo output (0% duty).
+        """
+        logger.info(f"{self.name}: disabling output")
+        self.pwm.disable_channel(self.channel)
+
+    def __repr__(self) -> str:
+        return (
+            f"Servo(name='{self.name}', channel={self.channel}, "
+            f"current={self._current_angle}°, range={self.min_angle}°-{self.max_angle}°)"
+        )
