@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-tools/test_one_servo_pca.py — Non-interactive single servo test via PCA9685
+tools/test_one_servo_pca.py — Large-movement single servo test via PCA9685
 
-Moves ONE channel: center -> small left -> center -> small right -> center
+Moves ONE channel:
+  center -> far left -> center -> far right -> center
 
 Usage:
   python3 -m tools.test_one_servo_pca --channel 0
-  python3 -m tools.test_one_servo_pca --channel 1 --min_us 1000 --max_us 2000
 """
 
 from __future__ import annotations
@@ -23,17 +23,34 @@ def clamp(x: int, lo: int, hi: int) -> int:
     return max(lo, min(hi, x))
 
 
+def sweep(pwm, ch, start, end, step, delay):
+    if start < end:
+        p = start
+        while p <= end:
+            pwm.set_pulse_width(ch, p)
+            time.sleep(delay)
+            p += step
+    else:
+        p = start
+        while p >= end:
+            pwm.set_pulse_width(ch, p)
+            time.sleep(delay)
+            p -= step
+
+
 def main() -> int:
     setup_logging()
     cfg = load_config("config/default.yaml")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--channel", type=int, default=0, help="PCA9685 channel (0-15)")
-    parser.add_argument("--center_us", type=int, default=1500, help="Center pulse (us)")
-    parser.add_argument("--delta_us", type=int, default=150, help="Move amount from center (us)")
-    parser.add_argument("--min_us", type=int, default=500, help="Hard min clamp (us)")
-    parser.add_argument("--max_us", type=int, default=2500, help="Hard max clamp (us)")
-    parser.add_argument("--hold", type=float, default=0.8, help="Hold seconds at each position")
+    parser.add_argument("--channel", type=int, default=0)
+    parser.add_argument("--center_us", type=int, default=1500)
+    parser.add_argument("--delta_us", type=int, default=400)  # MUCH LARGER
+    parser.add_argument("--min_us", type=int, default=800)    # safer real limits
+    parser.add_argument("--max_us", type=int, default=2200)
+    parser.add_argument("--step", type=int, default=10)
+    parser.add_argument("--delay", type=float, default=0.02)
+    parser.add_argument("--hold", type=float, default=1.0)
     args = parser.parse_args()
 
     i2c_bus = int(cfg.get("hardware.i2c_bus", 1))
@@ -41,23 +58,40 @@ def main() -> int:
     freq = int(cfg.get("arm.pwm_frequency", 50))
 
     ch = args.channel
-    center = clamp(args.center_us, args.min_us, args.max_us)
-    a1 = clamp(center - args.delta_us, args.min_us, args.max_us)
-    a2 = clamp(center + args.delta_us, args.min_us, args.max_us)
 
-    print("\n=== Single Servo Test (PCA9685) ===")
-    print(f"I2C bus: {i2c_bus}  addr: 0x{i2c_addr:02X}  freq: {freq}Hz")
+    center = clamp(args.center_us, args.min_us, args.max_us)
+    left = clamp(center - args.delta_us, args.min_us, args.max_us)
+    right = clamp(center + args.delta_us, args.min_us, args.max_us)
+
+    print("\n=== Large Servo Movement Test ===")
     print(f"Channel: {ch}")
-    print(f"Pulses: {center} -> {a1} -> {center} -> {a2} -> {center}")
+    print(f"Center: {center} us")
+    print(f"Left:   {left} us")
+    print(f"Right:  {right} us")
     print("CTRL+C to stop.\n")
 
     pwm = PCA9685(i2c_bus=i2c_bus, address=i2c_addr, frequency=freq, simulate=False)
 
     try:
-        for pulse in (center, a1, center, a2, center):
-            pwm.set_pulse_width(ch, int(pulse))
-            print(f"Set channel {ch} to {pulse} us")
-            time.sleep(args.hold)
+        # Go to center
+        pwm.set_pulse_width(ch, center)
+        time.sleep(args.hold)
+
+        # Sweep to left
+        sweep(pwm, ch, center, left, args.step, args.delay)
+        time.sleep(args.hold)
+
+        # Sweep back to center
+        sweep(pwm, ch, left, center, args.step, args.delay)
+        time.sleep(args.hold)
+
+        # Sweep to right
+        sweep(pwm, ch, center, right, args.step, args.delay)
+        time.sleep(args.hold)
+
+        # Sweep back to center
+        sweep(pwm, ch, right, center, args.step, args.delay)
+        time.sleep(args.hold)
 
         print("\n✅ Done.")
         return 0
@@ -68,7 +102,7 @@ def main() -> int:
 
     finally:
         try:
-            pwm.set_pwm(ch, 0, 0)  # disable channel
+            pwm.set_pwm(ch, 0, 0)
         except Exception:
             pass
         pwm.close()
