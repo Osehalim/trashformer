@@ -45,7 +45,7 @@ def find_stop_pulse(arm: ArmController) -> int:
     
     # Test values starting LOW and increasing
     # Start well below typical stop point to avoid spinning
-    test_pulses = [1450, 1460, 1470, 1480, 1490, 1500, 1510, 1520, 1530]
+    test_pulses = [100, 1460, 1470, 1480, 1490, 1500, 1510, 1520, 1530]
     
     for pulse in test_pulses:
         print(f"\nTesting {pulse}μs...")
