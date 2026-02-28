@@ -5,20 +5,24 @@ Semantics (per your default.yaml):
 - Shoulder: 0° down, 90° horizontal, 180° up (POSITION servo)
 - Elbow: 0° center/straight, rotates RIGHT to 90° (CONTINUOUS servo - timed movement)
 - Gripper: 0° open, 90° closed (POSITION servo)
+
+IMPORTANT:
+- arm.servo_continuous.py no longer exists.
+- We now import Servo from arm.servo (which supports BOTH position + continuous).
 """
 
 from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Dict, Optional, List, Tuple, Any
+from typing import Dict, Optional, List, Tuple
 
 import yaml
 
 from utils.logger import get_logger
 from utils.config_loader import load_config, ConfigLoader
 from arm.pca9685_driver import PCA9685
-from arm.servo_continuous import Servo  # Updated to use continuous-capable servo
+from arm.servo import Servo  # <-- updated: continuous-capable Servo lives here now
 
 logger = get_logger(__name__)
 
@@ -37,27 +41,36 @@ class ArmController:
         pwm_freq = int(self.config.get("arm.pwm_frequency", 50))
 
         logger.info(f"Initializing ArmController (simulate={self.simulate})")
-        self.pwm = PCA9685(i2c_bus=i2c_bus, address=i2c_address, frequency=pwm_freq, simulate=self.simulate)
+        self.pwm = PCA9685(
+            i2c_bus=i2c_bus,
+            address=i2c_address,
+            frequency=pwm_freq,
+            simulate=self.simulate,
+        )
 
         # Movement settings
         self.default_speed = float(self.config.get("arm.movement.default_speed", 50))
+        # In your config this key is called smooth_steps, but Servo expects smooth_hz.
         smooth_hz = float(self.config.get("arm.movement.smooth_steps", 10))
 
-        # PWM limits
+        # PWM limits (global defaults)
         min_pulse = int(self.config.get("arm.pwm_limits.min_pulse", 500))
         max_pulse = int(self.config.get("arm.pwm_limits.max_pulse", 2500))
 
         # Channels + limits
-        channels = self.config.get_section("arm").get("servo_channels", {})
-        limits = self.config.get_section("arm").get("angle_limits", {})
+        arm_section = self.config.get_section("arm")
+        channels = arm_section.get("servo_channels", {})
+        limits = arm_section.get("angle_limits", {})
 
         # Continuous servo settings (for elbow)
-        continuous_config = self.config.get_section("arm").get("continuous_servo", {})
+        continuous_config = arm_section.get("continuous_servo", {})
 
         # Create servos
         self.servos: Dict[str, Servo] = {}
 
-        # Shoulder - POSITION servo
+        # -----------------------
+        # Shoulder (POSITION servo)
+        # -----------------------
         shoulder = limits.get("shoulder", {})
         self.servos["shoulder"] = Servo(
             pwm_controller=self.pwm,
@@ -70,10 +83,12 @@ class ArmController:
             home_angle=float(shoulder.get("home", 0)),
             neutral_angle=float(shoulder.get("home", 0)),
             smooth_hz=smooth_hz,
-            continuous=False,  # Position servo
+            continuous=False,
         )
 
-        # Elbow - CONTINUOUS servo (timed movement)
+        # -----------------------
+        # Elbow (CONTINUOUS servo)
+        # -----------------------
         elbow = limits.get("elbow", {})
         self.servos["elbow"] = Servo(
             pwm_controller=self.pwm,
@@ -86,12 +101,16 @@ class ArmController:
             home_angle=float(elbow.get("home", 0)),
             neutral_angle=float(elbow.get("home", 0)),
             smooth_hz=smooth_hz,
-            continuous=True,  # ← CONTINUOUS ROTATION SERVO
+            continuous=True,
             stop_pulse=int(continuous_config.get("stop_pulse", 1500)),
             speed_pulse_range=int(continuous_config.get("speed_pulse_range", 100)),
+            degrees_per_second=float(continuous_config.get("degrees_per_second", 120.0)),
+            min_move_deg=float(continuous_config.get("min_move_deg", 1.0)),
         )
 
-        # Gripper - POSITION servo
+        # -----------------------
+        # Gripper (POSITION servo)
+        # -----------------------
         gripper = limits.get("gripper", {})
         self.servos["gripper"] = Servo(
             pwm_controller=self.pwm,
@@ -104,7 +123,7 @@ class ArmController:
             home_angle=float(gripper.get("home", 0)),
             neutral_angle=float(gripper.get("home", 0)),
             smooth_hz=smooth_hz,
-            continuous=False,  # Position servo
+            continuous=False,
         )
 
         # Poses
@@ -116,6 +135,9 @@ class ArmController:
 
         logger.info(f"ArmController ready: servos={list(self.servos.keys())}, poses={len(self.poses)}")
 
+    # ------------------------------------------------------------
+    # Poses
+    # ------------------------------------------------------------
     def _load_poses(self) -> None:
         """Load poses from arm/poses.yaml relative to this file."""
         poses_file = Path(__file__).with_name("poses.yaml")
@@ -130,17 +152,19 @@ class ArmController:
                 logger.warning("poses.yaml did not parse to a dict; ignoring")
                 return
 
-            # Ensure pose entries are dicts
             cleaned: Dict[str, Dict[str, float]] = {}
             for pose_name, pose in data.items():
                 if isinstance(pose, dict):
                     cleaned[pose_name] = {k: float(v) for k, v in pose.items()}
-            self.poses = cleaned
 
+            self.poses = cleaned
             logger.info(f"Loaded {len(self.poses)} poses from {poses_file}")
         except Exception as e:
             logger.error(f"Error loading poses: {e}")
 
+    # ------------------------------------------------------------
+    # Basic helpers
+    # ------------------------------------------------------------
     def get_servo(self, name: str) -> Optional[Servo]:
         return self.servos.get(name)
 
@@ -148,6 +172,7 @@ class ArmController:
         return {name: servo.get_angle() for name, servo in self.servos.items()}
 
     def set_angles(self, angles: Dict[str, float], validate: bool = True) -> bool:
+        """Immediate set (no smoothing for position; continuous will still time-move)."""
         if not self.is_enabled:
             logger.warning("Arm is disabled; ignoring set_angles")
             return False
@@ -163,17 +188,32 @@ class ArmController:
                 ok = False
         return ok
 
+    # ------------------------------------------------------------
+    # Movement
+    # ------------------------------------------------------------
     def move_to_angles(self, angles: Dict[str, float], speed: Optional[float] = None, blocking: bool = True) -> bool:
+        """
+        Move multiple servos.
+
+        POSITION servos:
+          - We try to synchronize timing using a simple max_time approach.
+
+        CONTINUOUS servos:
+          - Servo.move_to() is inherently blocking because it sleeps to time the move.
+          - So for continuous servos, we move them sequentially here to keep behavior predictable.
+
+        In practice, your test scripts mostly move one joint at a time, so this is fine.
+        """
         if not self.is_enabled:
             logger.warning("Arm is disabled; ignoring move_to_angles")
             return False
 
-        speed = float(speed) if speed is not None else self.default_speed
-        speed = max(1.0, speed)
+        speed_val = float(speed) if speed is not None else self.default_speed
+        speed_val = max(1.0, speed_val)
 
-        # Determine max move time for synchronization
-        max_time = 0.0
-        moves: List[Tuple[Servo, float, float]] = []
+        # Split moves into position vs continuous
+        pos_moves: List[Tuple[Servo, float, float]] = []
+        cont_moves: List[Tuple[Servo, float]] = []
 
         for name, target in angles.items():
             servo = self.servos.get(name)
@@ -181,37 +221,52 @@ class ArmController:
                 logger.warning(f"Unknown servo: {name}")
                 continue
 
-            target = float(target)
-            current = servo.get_angle()
-            if current is None:
-                servo.set_angle(target)
-                continue
+            target_f = float(target)
 
-            delta = abs(target - float(current))
-            t = delta / speed if speed > 0 else 0.0
-            max_time = max(max_time, t)
-            moves.append((servo, target, delta))
-
-        if not moves:
-            return True
-
-        if max_time <= 0:
-            for servo, target, _delta in moves:
-                servo.set_angle(target)
-            return True
+            if servo.continuous:
+                cont_moves.append((servo, target_f))
+            else:
+                current = servo.get_angle()
+                if current is None:
+                    servo.set_angle(target_f)
+                    continue
+                delta = abs(target_f - float(current))
+                pos_moves.append((servo, target_f, delta))
 
         ok = True
-        for servo, target, delta in moves:
-            servo_speed = (delta / max_time) if max_time > 0 else speed
-            servo_speed = max(1.0, servo_speed)
-            if not servo.move_to(target, speed=servo_speed, blocking=False):
-                ok = False
 
-        if blocking:
-            time.sleep(max_time)
+        # 1) Move POSITION servos synchronized
+        if pos_moves:
+            max_time = 0.0
+            for _servo, _target, delta in pos_moves:
+                t = delta / speed_val if speed_val > 0 else 0.0
+                max_time = max(max_time, t)
+
+            if max_time <= 0.0:
+                for servo, target, _delta in pos_moves:
+                    if not servo.set_angle(target):
+                        ok = False
+            else:
+                for servo, target, delta in pos_moves:
+                    servo_speed = (delta / max_time) if max_time > 0 else speed_val
+                    servo_speed = max(1.0, servo_speed)
+                    if not servo.move_to(target, speed=servo_speed, blocking=False):
+                        ok = False
+
+                if blocking:
+                    time.sleep(max_time)
+
+        # 2) Move CONTINUOUS servos sequentially (predictable)
+        # speed_val is treated as a "speed scaling factor/percent" by your Servo implementation.
+        for servo, target in cont_moves:
+            if not servo.move_to(target, speed=speed_val, blocking=True):
+                ok = False
 
         return ok
 
+    # ------------------------------------------------------------
+    # Pose control
+    # ------------------------------------------------------------
     def go_to_pose(self, pose_name: str, speed: Optional[float] = None, blocking: bool = True) -> bool:
         pose = self.poses.get(pose_name)
         if pose is None:
@@ -233,8 +288,9 @@ class ArmController:
             return self.go_to_pose("neutral", speed=speed, blocking=blocking)
         return self.move_to_angles({"shoulder": 0, "elbow": 0, "gripper": 0}, speed=speed, blocking=blocking)
 
-    # ---- Convenience controls ----
-
+    # ------------------------------------------------------------
+    # Convenience controls
+    # ------------------------------------------------------------
     def shoulder_up(self, angle: float = 180, speed: Optional[float] = None) -> bool:
         return self.servos["shoulder"].move_to(angle, speed=speed)
 
@@ -242,6 +298,7 @@ class ArmController:
         return self.servos["shoulder"].move_to(angle, speed=speed)
 
     def shoulder_horizontal(self, speed: Optional[float] = None) -> bool:
+        # Your semantics say 90 is horizontal
         return self.servos["shoulder"].move_to(90, speed=speed)
 
     def elbow_center(self, speed: Optional[float] = None) -> bool:
@@ -262,6 +319,9 @@ class ArmController:
     def set_gripper(self, angle: float, speed: Optional[float] = None) -> bool:
         return self.servos["gripper"].move_to(angle, speed=speed)
 
+    # ------------------------------------------------------------
+    # Utility / sequences
+    # ------------------------------------------------------------
     def list_poses(self) -> List[str]:
         return sorted(self.poses.keys())
 
@@ -272,18 +332,20 @@ class ArmController:
             speed = step[1] if len(step) >= 2 else None
             pause = step[2] if len(step) >= 3 else pause_between
 
-            logger.info(f"Step {i+1}/{len(sequence)}: {pose_name}")
+            logger.info(f"Step {i + 1}/{len(sequence)}: {pose_name}")
             if not self.go_to_pose(pose_name, speed=speed, blocking=True):
-                logger.error(f"Sequence failed at step {i+1} ({pose_name})")
+                logger.error(f"Sequence failed at step {i + 1} ({pose_name})")
                 return False
             time.sleep(pause)
 
         logger.info("Sequence complete")
         return True
 
+    # ------------------------------------------------------------
+    # Safety / lifecycle
+    # ------------------------------------------------------------
     def emergency_stop(self) -> None:
         logger.critical("EMERGENCY STOP: disabling all servos NOW")
-        # Stop continuous servos immediately
         for servo in self.servos.values():
             if servo.continuous:
                 servo.stop()
@@ -302,7 +364,6 @@ class ArmController:
     def close(self) -> None:
         logger.info("Closing ArmController")
         try:
-            # Stop continuous servos before disabling
             for servo in self.servos.values():
                 if servo.continuous:
                     servo.stop()
