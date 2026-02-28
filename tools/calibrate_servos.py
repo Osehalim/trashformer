@@ -65,7 +65,7 @@ def test_servo_range(pwm: PCA9685, channel: int, name: str) -> tuple:
     # Find maximum
     print(f"\n3. Finding MAXIMUM position...")
     
-    test_values = [2000, 2200, 2400, 2500, 2300, 2100]
+    test_values = [2000, 2200, 2400, 2500, 2600, 2700]
     max_pulse = 2000
     
     for pulse in test_values:
