@@ -42,7 +42,7 @@ arm:
   angle_limits:
     shoulder:
       min: 0
-      max: 180
+      max: 360
       home: 0
     elbow:
       min: 0
@@ -62,7 +62,7 @@ arm:
   continuous_servo:
     stop_pulse: 1500
     speed_pulse_range: 120
-    degrees_per_second: 180   
+    degrees_per_second: 120   
   
   # Movement settings
   movement:
