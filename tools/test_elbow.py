@@ -34,18 +34,32 @@ def find_stop_pulse(arm: ArmController) -> int:
     print("Watch the elbow carefully and tell me when it's completely stopped.")
     print()
     
-    # Test values around 1500μs
-    test_pulses = [1500, 1490, 1510, 1480, 1520, 1470, 1530]
+    # First, try to stop it with a very low value
+    print("First, I'll send a LOW pulse to try to stop any movement...")
+    elbow.pwm.set_pulse_width(elbow.channel, 1450)
+    time.sleep(2)
+    
+    print("\nNow testing different pulses, starting low and going higher.")
+    print("We're looking for the LOWEST pulse that keeps it STOPPED.")
+    print()
+    
+    # Test values starting LOW and increasing
+    # Start well below typical stop point to avoid spinning
+    test_pulses = [1450, 1460, 1470, 1480, 1490, 1500, 1510, 1520, 1530]
     
     for pulse in test_pulses:
-        print(f"\nTrying {pulse}μs...")
+        print(f"\nTesting {pulse}μs...")
         elbow.pwm.set_pulse_width(elbow.channel, pulse)
-        time.sleep(2)
+        print("  (waiting 3 seconds for you to observe...)")
+        time.sleep(3)
         
-        response = input(f"  Is elbow STOPPED at {pulse}μs? (y/n): ").lower()
+        response = input(f"  Is elbow COMPLETELY STOPPED at {pulse}μs? (y/n/skip): ").lower()
         if response == 'y':
             print(f"\n✓ Stop pulse found: {pulse}μs")
+            print(f"  (If it starts spinning again, the true stop is higher)")
             return pulse
+        elif response == 'skip':
+            break
     
     # If none worked, ask user
     print("\nCouldn't find it automatically.")
