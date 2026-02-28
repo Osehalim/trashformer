@@ -55,8 +55,8 @@ arm:
   
   # PWM pulse width limits (microseconds)
   pwm_limits:
-    min_pulse: 500
-    max_pulse: 2500
+    min_pulse: 600   # ← Use values from calibration
+    max_pulse: 2400  # ← Use values from calibration
   
   # Movement settings
   movement:
