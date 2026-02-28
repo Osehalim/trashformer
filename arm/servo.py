@@ -91,6 +91,11 @@ class Servo:
             f"Initialized {self.name} servo on channel {self.channel} ({mode} mode) "
             f"(angle range: {self.min_angle}°-{self.max_angle}°, home: {self.home_angle}°)"
         )
+        if self.continuous:
+            logger.info(
+                f"  stop_pulse={self.stop_pulse}μs, speed_range=±{self.speed_pulse_range}μs, "
+                f"speed={self.degrees_per_second}°/s"
+            )
 
     def _clamp_angle(self, angle: float) -> float:
         a = float(angle)

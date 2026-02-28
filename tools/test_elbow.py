@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """
-Elbow Continuous Servo Test
+Elbow Continuous Servo Calibration - Direct PWM Control
 
-This script:
-1. Finds the exact stop pulse for your elbow servo
-2. Tests turning right and returning to center
-3. Helps calibrate the movement speed
+This script finds the stop pulse WITHOUT using ArmController.
+It sends raw PWM values directly to avoid any automatic movement.
 
 Your elbow servo: ServoCity 2000 Series 5-Turn (CONTINUOUS)
 """
@@ -13,240 +11,195 @@ Your elbow servo: ServoCity 2000 Series 5-Turn (CONTINUOUS)
 from __future__ import annotations
 import time
 from utils.logger import setup_logging, get_logger
-from utils.config_loader import load_config
-from arm.arm_controller import ArmController
+from arm.pca9685_driver import PCA9685
 
 logger = get_logger(__name__)
 
 
-def find_stop_pulse(arm: ArmController) -> int:
+def find_stop_pulse_direct() -> int:
     """
-    Find the exact pulse width that stops the elbow servo.
+    Find stop pulse using DIRECT PWM control (no ArmController).
     
     Returns the stop pulse value.
     """
-    elbow = arm.servos["elbow"]
-    
     print("\n" + "=" * 60)
-    print("STEP 1: FIND STOP PULSE")
+    print("ELBOW STOP PULSE CALIBRATION (Direct PWM)")
     print("=" * 60)
-    print("\nWe need to find the pulse that makes the elbow STOP spinning.")
-    print("Watch the elbow carefully and tell me when it's completely stopped.")
+    print()
+    print("This uses RAW PWM commands to avoid automatic movement.")
+    print("Watch the elbow and tell me when it STOPS spinning.")
     print()
     
-    # First, try to stop it with a very low value
-    print("First, I'll send a LOW pulse to try to stop any movement...")
-    elbow.pwm.set_pulse_width(elbow.channel, 1450)
-    time.sleep(2)
+    # Initialize PCA9685 directly
+    pwm = PCA9685(i2c_bus=1, address=0x40, frequency=50, simulate=False)
+    elbow_channel = 1
     
-    print("\nNow testing different pulses, starting low and going higher.")
-    print("We're looking for the LOWEST pulse that keeps it STOPPED.")
+    print("Initializing...")
+    print("First, sending 1450μs (very low) to try to stop any movement...")
+    pwm.set_pulse_width(elbow_channel, 1450)
+    time.sleep(3)
+    
+    print()
+    print("Now testing pulses from LOW to HIGH...")
+    print("We're looking for the pulse where it STOPS completely.")
     print()
     
-    # Test values starting LOW and increasing
-    # Start well below typical stop point to avoid spinning
-    test_pulses = [100, 1460, 1470, 1480, 1490, 1500, 1510, 1520, 1530]
+    # Test from LOW to HIGH
+    test_pulses = [1450, 1460, 1470, 1480, 1490, 1500, 1510, 1520, 1530, 1540, 1550]
+    
+    stop_pulse = 1500  # default
     
     for pulse in test_pulses:
         print(f"\nTesting {pulse}μs...")
-        elbow.pwm.set_pulse_width(elbow.channel, pulse)
-        print("  (waiting 3 seconds for you to observe...)")
-        time.sleep(3)
+        pwm.set_pulse_width(elbow_channel, pulse)
+        print(f"  (Sent {pulse}μs to elbow, waiting 4 seconds...)")
+        time.sleep(4)
         
         response = input(f"  Is elbow COMPLETELY STOPPED at {pulse}μs? (y/n/skip): ").lower()
+        
         if response == 'y':
             print(f"\n✓ Stop pulse found: {pulse}μs")
-            print(f"  (If it starts spinning again, the true stop is higher)")
-            return pulse
+            stop_pulse = pulse
+            pwm.close()
+            return stop_pulse
         elif response == 'skip':
             break
     
-    # If none worked, ask user
+    # Manual entry
     print("\nCouldn't find it automatically.")
-    stop_pulse = int(input("Enter stop pulse manually (try values 1450-1550): "))
+    stop_pulse = int(input("Enter stop pulse manually (1450-1550): "))
     
     # Verify
-    elbow.pwm.set_pulse_width(elbow.channel, stop_pulse)
-    time.sleep(2)
-    response = input(f"Stopped at {stop_pulse}? (y/n): ").lower()
+    print(f"\nVerifying {stop_pulse}μs...")
+    pwm.set_pulse_width(elbow_channel, stop_pulse)
+    time.sleep(3)
     
-    if response == 'y':
-        return stop_pulse
-    else:
-        print("Using 1500μs as default")
-        return 1500
-
-
-def test_elbow_movement(arm: ArmController, stop_pulse: int):
-    """
-    Test elbow turning right and returning to center.
-    """
-    elbow = arm.servos["elbow"]
-    
-    print("\n" + "=" * 60)
-    print("STEP 2: TEST ELBOW MOVEMENT")
-    print("=" * 60)
-    print(f"\nUsing stop pulse: {stop_pulse}μs")
-    print()
-    
-    # Update the servo's stop pulse
-    elbow.stop_pulse = stop_pulse
-    elbow._estimated_position = 0.0  # Reset to center
-    
-    input("Press Enter to start movement test...")
-    
-    # ================================================================
-    # Movement 1: Turn RIGHT
-    # ================================================================
-    print("\n--- Movement 1: Turning RIGHT (0° → 90°) ---")
-    print("Watch how far the elbow turns...")
-    
-    start_time = time.time()
-    elbow.move_to(90)  # Turn right 90 degrees
-    elapsed = time.time() - start_time
-    
-    print(f"Movement took {elapsed:.2f} seconds")
-    print(f"Estimated speed: {90/elapsed:.1f} degrees/second")
-    
-    input("\nDid it turn about 90° to the right? Press Enter...")
-    
-    # ================================================================
-    # Pause at right position
-    # ================================================================
-    print("\nElbow should be at 90° right position now.")
-    print("Servo should be STOPPED (not spinning).")
-    time.sleep(2)
-    
-    # ================================================================
-    # Movement 2: Return to CENTER
-    # ================================================================
-    print("\n--- Movement 2: Returning to CENTER (90° → 0°) ---")
-    
-    start_time = time.time()
-    elbow.move_to(0)  # Return to center
-    elapsed = time.time() - start_time
-    
-    print(f"Movement took {elapsed:.2f} seconds")
-    
-    input("\nDid it return to center? Press Enter...")
-    
-    # ================================================================
-    # Verify it's stopped
-    # ================================================================
-    print("\nElbow should be at center now.")
-    print("Servo should be STOPPED (not spinning).")
-    time.sleep(2)
-    
-    print("\n✓ Movement test complete!")
-
-
-def calibrate_speed(arm: ArmController, stop_pulse: int):
-    """
-    Help user calibrate the movement speed.
-    """
-    elbow = arm.servos["elbow"]
-    elbow.stop_pulse = stop_pulse
-    
-    print("\n" + "=" * 60)
-    print("STEP 3: CALIBRATE SPEED (Optional)")
-    print("=" * 60)
-    print()
-    
-    response = input("Do you want to calibrate the movement speed? (y/n): ").lower()
+    response = input(f"Stopped at {stop_pulse}μs? (y/n): ").lower()
     if response != 'y':
-        return
+        stop_pulse = int(input("Enter correct stop pulse: "))
     
-    print("\nWe'll measure how long it takes to move a known distance.")
-    print("This helps make movements more accurate.")
+    pwm.close()
+    return stop_pulse
+
+
+def test_movement_with_stop_pulse(stop_pulse: int):
+    """
+    Test elbow movement using the calibrated stop pulse.
+    """
+    from utils.config_loader import load_config
+    from arm.arm_controller import ArmController
+    
+    print("\n" + "=" * 60)
+    print("TESTING ELBOW MOVEMENT")
+    print("=" * 60)
+    print(f"\nUsing stop_pulse: {stop_pulse}μs")
     print()
     
-    # Reset position
-    elbow._estimated_position = 0.0
+    # Load config
+    cfg = load_config("config/default.yaml")
     
-    print("I'll turn the elbow right for exactly 2 seconds.")
-    print("Count how many degrees it rotates (estimate).")
-    input("Press Enter to start...")
-    
-    # Move for exactly 2 seconds
-    speed_pulse = stop_pulse + 100  # Slow speed
-    
-    print(f"\nSpinning at {speed_pulse}μs for 2 seconds...")
-    elbow.pwm.set_pulse_width(elbow.channel, speed_pulse)
-    time.sleep(2.0)
-    
-    # STOP
-    elbow.pwm.set_pulse_width(elbow.channel, stop_pulse)
-    
-    print("\nStopped.")
-    print("\nHow many degrees did it rotate? (estimate)")
-    print("Examples: 45, 90, 120, 180, 240, etc.")
-    
-    degrees = float(input("Degrees rotated: "))
-    
-    degrees_per_second = degrees / 2.0
-    
-    print(f"\n✓ Measured speed: {degrees_per_second:.1f} degrees/second")
-    print()
-    print("Update servo.py, line ~145:")
-    print(f"  DEGREES_PER_SECOND = {degrees_per_second:.1f}  # Was 120")
-    
-    # Return to center
-    print("\nReturning to center...")
-    move_time = degrees / degrees_per_second
-    reverse_pulse = stop_pulse - 100
-    
-    elbow.pwm.set_pulse_width(elbow.channel, reverse_pulse)
-    time.sleep(move_time)
-    elbow.pwm.set_pulse_width(elbow.channel, stop_pulse)
+    print("Creating ArmController...")
+    with ArmController(config=cfg, simulate=False) as arm:
+        
+        elbow = arm.servos["elbow"]
+        
+        # Update stop pulse
+        elbow.stop_pulse = stop_pulse
+        print(f"✓ Updated elbow stop_pulse to {stop_pulse}μs")
+        
+        # Make sure we're at center
+        print("\nEnsuring elbow is at center...")
+        elbow._estimated_position = 0.0
+        elbow.pwm.set_pulse_width(elbow.channel, stop_pulse)
+        time.sleep(2)
+        
+        input("\nPress Enter to test turning RIGHT 90°...")
+        
+        # Test 1: Turn right
+        print("\n--- Test 1: Turning RIGHT (0° → 90°) ---")
+        start_time = time.time()
+        elbow.move_to(90)
+        elapsed = time.time() - start_time
+        
+        print(f"Movement took {elapsed:.2f} seconds")
+        print(f"Estimated speed: {90/elapsed:.1f} degrees/second")
+        print("Elbow should be stopped at ~90° right")
+        
+        time.sleep(3)
+        input("\nPress Enter to return to CENTER...")
+        
+        # Test 2: Return to center
+        print("\n--- Test 2: Returning to CENTER (90° → 0°) ---")
+        start_time = time.time()
+        elbow.move_to(0)
+        elapsed = time.time() - start_time
+        
+        print(f"Movement took {elapsed:.2f} seconds")
+        print("Elbow should be stopped at center")
+        
+        time.sleep(2)
+        
+        print("\n✓ Movement test complete!")
+        print()
+        print("Did the elbow:")
+        print("  1. Stop at 90° right?")
+        print("  2. Return to center?")
+        print("  3. Stop at each position?")
+        
+        response = input("\nDid it work correctly? (y/n): ").lower()
+        
+        if response == 'y':
+            print("\n✓ Great! The stop pulse is correct.")
+        else:
+            print("\n⚠ If movement distance was wrong:")
+            print("   - Too far: Decrease degrees_per_second in default.yaml")
+            print("   - Too short: Increase degrees_per_second in default.yaml")
+            print("   - Kept spinning: Try different stop_pulse values")
 
 
 def main() -> int:
     setup_logging()
-    cfg = load_config("config/default.yaml")
     
     print("=" * 60)
-    print("ELBOW CONTINUOUS SERVO TEST")
+    print("ELBOW CONTINUOUS SERVO CALIBRATION")
     print("=" * 60)
     print()
-    print("Servo: ServoCity 2000 Series 5-Turn (CONTINUOUS)")
-    print("Channel: 1")
+    print("Servo: ServoCity 2000 Series 5-Turn")
+    print("Channel: 1 (Elbow)")
     print()
-    print("This test will:")
-    print("  1. Find the stop pulse")
+    print("This will:")
+    print("  1. Find the stop pulse (using direct PWM)")
     print("  2. Test turning right and returning to center")
-    print("  3. Optionally calibrate movement speed")
     print()
     
-    input("Make sure elbow servo is connected to Channel 1. Press Enter...")
+    input("Make sure elbow is connected to Channel 1. Press Enter...")
     
-    with ArmController(config=cfg, simulate=False) as arm:
-        
-        # Step 1: Find stop pulse
-        stop_pulse = find_stop_pulse(arm)
-        
-        # Step 2: Test movement
-        test_elbow_movement(arm, stop_pulse)
-        
-        # Step 3: Calibrate speed (optional)
-        calibrate_speed(arm, stop_pulse)
-        
-        # Final summary
-        print("\n" + "=" * 60)
-        print("TEST COMPLETE!")
-        print("=" * 60)
-        print()
-        print(f"Stop Pulse: {stop_pulse}μs")
-        print()
-        print("Update config/default.yaml:")
-        print("  continuous_servo:")
-        print(f"    stop_pulse: {stop_pulse}")
-        print()
-        
-        # Ensure stopped
-        elbow = arm.servos["elbow"]
-        elbow.pwm.set_pulse_width(elbow.channel, stop_pulse)
-        
-        return 0
+    # Step 1: Find stop pulse (direct PWM, no ArmController)
+    stop_pulse = find_stop_pulse_direct()
+    
+    # Step 2: Test movement (with ArmController)
+    test_movement_with_stop_pulse(stop_pulse)
+    
+    # Final summary
+    print("\n" + "=" * 60)
+    print("CALIBRATION COMPLETE!")
+    print("=" * 60)
+    print()
+    print(f"Stop Pulse: {stop_pulse}μs")
+    print()
+    print("=" * 60)
+    print("UPDATE config/default.yaml:")
+    print("=" * 60)
+    print()
+    print("continuous_servo:")
+    print(f"  stop_pulse: {stop_pulse}")
+    print(f"  speed_pulse_range: 120")
+    print(f"  degrees_per_second: 180")
+    print()
+    print("If movement distance was wrong, adjust degrees_per_second.")
+    print()
+    
+    return 0
 
 
 if __name__ == "__main__":
