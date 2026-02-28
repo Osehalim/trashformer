@@ -1,11 +1,22 @@
 #!/usr/bin/env python3
 """
-tools/test_arm_full.py — Full arm functional test (hardware)
+tools/test_arm_full.py — Single trash pickup simulation (hardware)
 
-Test Sequence:
-1) Full pickup and drop cycle (step by step)
-2) Shoulder full range test (0° to 180° and back)
-3) Elbow full range test (0° to 90° and back)
+What this does (ONE cycle):
+1) Go to "hanging/home" pose (shoulder hanging, elbow centered, gripper open)
+2) Open gripper (hold 1s)
+3) Close gripper (grab)
+4) Lift shoulder to horizontal
+5) Rotate elbow right to drop position
+6) Open gripper to drop (hold 1s)
+7) Close gripper
+8) Return elbow to center
+9) Lower shoulder back to hanging
+10) Open gripper (ready)
+
+NOTES:
+- This assumes your ELBOW is a CONTINUOUS servo and ArmController/Servo already handle
+  timed motion for elbow when you call move_to()/elbow_right()/elbow_center().
 
 Safety:
 - Keep the arm clear.
@@ -23,8 +34,7 @@ from arm.arm_controller import ArmController
 logger = get_logger(__name__)
 
 
-def wait(sec: float = 1.5) -> None:
-    """Wait with visual feedback."""
+def wait(sec: float) -> None:
     time.sleep(sec)
 
 
@@ -32,17 +42,36 @@ def main() -> int:
     setup_logging()
     cfg = load_config("config/default.yaml")
 
-    # Timing
-    DELAY = 2.0  # Pause between movements
-    SPEED = 50   # Movement speed (degrees/sec)
+    # -----------------------------
+    # TUNE THESE NUMBERS
+    # -----------------------------
+    # You said: shoulder "regular hanging position" is 90 degrees
+    SHOULDER_HANGING = 90.0
+    # Shoulder horizontal: adjust if 180 isn't correct for your mounting
+    # (If hanging is 90, horizontal is often 180, but depends on install.)
+    SHOULDER_HORIZONTAL = 180.0
+
+    # Elbow angles are "virtual degrees" for the continuous servo timing model.
+    # 0 = center/in line; 90 = right
+    ELBOW_CENTER = 0.0
+    ELBOW_RIGHT = 90.0
+
+    # Gripper: adjust these if your linkage binds or doesn't open enough
+    GRIPPER_OPEN = 0.0
+    GRIPPER_CLOSED = 90.0
+
+    # Timing / speed
+    # For position servos, ArmController treats speed as deg/sec.
+    # For your continuous elbow, your Servo should interpret speed as a scaling factor/percent.
+    SPEED = 50.0          # start here
+    PAUSE = 1.0           # pause between steps
+    HOLD_OPEN_SEC = 1.0   # how long to keep gripper open at pickup/drop
 
     # simulate=False => real PCA9685 on I2C
-    # Change to simulate=True to test without hardware
     with ArmController(config=cfg, simulate=False) as arm:
         logger.info("=" * 60)
-        logger.info("ARM FULL TEST START")
+        logger.info("SINGLE PICKUP CYCLE TEST START")
         logger.info("=" * 60)
-        logger.info("")
 
         # Print servo channels for debugging
         logger.info("Servo Channel Mapping:")
@@ -50,173 +79,98 @@ def main() -> int:
             logger.info(f"  {name}: Channel {servo.channel}")
         logger.info("")
 
-        # ================================================================
-        # TEST 1: FULL PICKUP AND DROP CYCLE
-        # ================================================================
-        logger.info("=" * 60)
-        logger.info("TEST 1: FULL PICKUP AND DROP CYCLE")
-        logger.info("=" * 60)
-        logger.info("")
+        # ------------------------------------------------
+        # Step 1: Go to hanging/home pose
+        # ------------------------------------------------
+        logger.info("Step 1: Going to HANGING pose (home)")
+        logger.info(f"  - Shoulder: {SHOULDER_HANGING}° (hanging)")
+        logger.info(f"  - Elbow: {ELBOW_CENTER}° (center)")
+        logger.info(f"  - Gripper: {GRIPPER_OPEN}° (open)")
 
-        # Step 1: Start at home position
-        logger.info("Step 1: Going to HOME position")
-        logger.info("  - Shoulder: 0° (down)")
-        logger.info("  - Elbow: 0° (center)")
-        logger.info("  - Gripper: 0° (open)")
-        arm.home(speed=SPEED, blocking=True)
-        wait(DELAY)
+        arm.move_to_angles(
+            {
+                "shoulder": SHOULDER_HANGING,
+                "elbow": ELBOW_CENTER,
+                "gripper": GRIPPER_OPEN,
+            },
+            speed=SPEED,
+            blocking=True,
+        )
+        wait(PAUSE)
 
-        # Step 2: Open gripper (ensure it's open)
-        logger.info("Step 2: Opening gripper to prepare for pickup")
-        logger.info("  - Gripper: 0° (open)")
-        arm.open_gripper(speed=SPEED)
-        wait(DELAY)
+        # ------------------------------------------------
+        # Step 2: Open gripper (ensure open) and hold
+        # ------------------------------------------------
+        logger.info("Step 2: Opening gripper (prepare to pickup) + hold")
+        arm.set_gripper(GRIPPER_OPEN, speed=SPEED)
+        wait(HOLD_OPEN_SEC)
 
-        # Step 3: Close gripper to grab trash
-        logger.info("Step 3: Closing gripper to GRAB trash")
-        logger.info("  - Gripper: 90° (closed)")
-        arm.close_gripper(speed=SPEED)
-        wait(DELAY)
+        # ------------------------------------------------
+        # Step 3: Close gripper to grab
+        # ------------------------------------------------
+        logger.info("Step 3: Closing gripper (GRAB)")
+        arm.set_gripper(GRIPPER_CLOSED, speed=SPEED)
+        wait(PAUSE)
 
-        # Step 4: Lift shoulder to horizontal (90°)
+        # ------------------------------------------------
+        # Step 4: Lift shoulder to horizontal
+        # ------------------------------------------------
         logger.info("Step 4: Lifting shoulder to HORIZONTAL")
-        logger.info("  - Shoulder: 0° → 90° (horizontal)")
-        arm.shoulder_horizontal(speed=SPEED)
-        wait(DELAY)
+        logger.info(f"  - Shoulder: {SHOULDER_HANGING}° -> {SHOULDER_HORIZONTAL}°")
+        arm.shoulder_up(SHOULDER_HORIZONTAL, speed=SPEED)
+        wait(PAUSE)
 
-        # Step 5: Turn elbow right to drop position (90°)
-        logger.info("Step 5: Turning elbow RIGHT to drop position")
-        logger.info("  - Elbow: 0° → 90° (fully right)")
-        arm.elbow_right(90, speed=SPEED)
-        wait(DELAY)
+        # ------------------------------------------------
+        # Step 5: Rotate elbow right (continuous servo timed move)
+        # ------------------------------------------------
+        logger.info("Step 5: Rotating elbow RIGHT to drop position")
+        logger.info(f"  - Elbow: {ELBOW_CENTER}° -> {ELBOW_RIGHT}°")
+        arm.elbow_right(ELBOW_RIGHT, speed=SPEED)
+        wait(PAUSE)
 
-        # Step 6: Open gripper to drop trash
-        logger.info("Step 6: Opening gripper to DROP trash")
-        logger.info("  - Gripper: 90° → 0° (open)")
-        arm.open_gripper(speed=SPEED)
-        wait(DELAY)
+        # ------------------------------------------------
+        # Step 6: Open gripper to drop + hold
+        # ------------------------------------------------
+        logger.info("Step 6: Opening gripper to DROP + hold")
+        arm.set_gripper(GRIPPER_OPEN, speed=SPEED)
+        wait(HOLD_OPEN_SEC)
 
-        # Step 7: Close gripper (ready for next cycle)
-        logger.info("Step 7: Closing gripper")
-        logger.info("  - Gripper: 0° → 90° (closed)")
-        arm.close_gripper(speed=SPEED)
-        wait(DELAY)
+        # ------------------------------------------------
+        # Step 7: Close gripper again
+        # ------------------------------------------------
+        logger.info("Step 7: Closing gripper (reset)")
+        arm.set_gripper(GRIPPER_CLOSED, speed=SPEED)
+        wait(PAUSE)
 
+        # ------------------------------------------------
         # Step 8: Return elbow to center
+        # ------------------------------------------------
         logger.info("Step 8: Returning elbow to CENTER")
-        logger.info("  - Elbow: 90° → 0° (center)")
+        logger.info(f"  - Elbow: {ELBOW_RIGHT}° -> {ELBOW_CENTER}°")
         arm.elbow_center(speed=SPEED)
-        wait(DELAY)
+        wait(PAUSE)
 
-        # Step 9: Lower shoulder back to home
-        logger.info("Step 9: Lowering shoulder back to HOME")
-        logger.info("  - Shoulder: 90° → 0° (down)")
-        arm.shoulder_down(0, speed=SPEED)
-        wait(DELAY)
+        # ------------------------------------------------
+        # Step 9: Lower shoulder back to hanging
+        # ------------------------------------------------
+        logger.info("Step 9: Lowering shoulder back to HANGING")
+        logger.info(f"  - Shoulder: {SHOULDER_HORIZONTAL}° -> {SHOULDER_HANGING}°")
+        arm.shoulder_down(SHOULDER_HANGING, speed=SPEED)
+        wait(PAUSE)
 
-        # Step 10: Open gripper to complete cycle
-        logger.info("Step 10: Opening gripper to complete cycle")
-        logger.info("  - Gripper: 90° → 0° (open)")
-        arm.open_gripper(speed=SPEED)
-        wait(DELAY)
+        # ------------------------------------------------
+        # Step 10: Open gripper (ready)
+        # ------------------------------------------------
+        logger.info("Step 10: Opening gripper (ready)")
+        arm.set_gripper(GRIPPER_OPEN, speed=SPEED)
+        wait(PAUSE)
 
         logger.info("")
-        logger.info("✅ TEST 1 COMPLETE: Full pickup cycle finished!")
-        logger.info("")
-        wait(2)
-
-        # ================================================================
-        # TEST 2: SHOULDER FULL RANGE TEST
-        # ================================================================
-        logger.info("=" * 60)
-        logger.info("TEST 2: SHOULDER FULL RANGE TEST")
+        logger.info("✅ SINGLE PICKUP CYCLE COMPLETE")
         logger.info("=" * 60)
         logger.info("")
 
-        # Ensure we start from home
-        logger.info("Starting from HOME position")
-        arm.home(speed=SPEED, blocking=True)
-        wait(DELAY)
-
-        # Shoulder up to full 180°
-        logger.info("Moving shoulder UP to 180° (fully up)")
-        logger.info("  - Shoulder: 0° → 180°")
-        arm.shoulder_up(180, speed=SPEED)
-        wait(DELAY)
-
-        # Shoulder back down to 0°
-        logger.info("Moving shoulder DOWN to 0° (home)")
-        logger.info("  - Shoulder: 180° → 0°")
-        arm.shoulder_down(0, speed=SPEED)
-        wait(DELAY)
-
-        logger.info("")
-        logger.info("✅ TEST 2 COMPLETE: Shoulder range test finished!")
-        logger.info("")
-        wait(2)
-
-        # ================================================================
-        # TEST 3: ELBOW FULL RANGE TEST
-        # ================================================================
-        logger.info("=" * 60)
-        logger.info("TEST 3: ELBOW FULL RANGE TEST")
-        logger.info("=" * 60)
-        logger.info("")
-
-        # Lift shoulder to horizontal for safety during elbow test
-        logger.info("Lifting shoulder to HORIZONTAL for elbow test")
-        logger.info("  - Shoulder: 0° → 90°")
-        arm.shoulder_horizontal(speed=SPEED)
-        wait(DELAY)
-
-        # Elbow to center (should already be there)
-        logger.info("Ensuring elbow is at CENTER")
-        logger.info("  - Elbow: 0° (center)")
-        arm.elbow_center(speed=SPEED)
-        wait(DELAY)
-
-        # Elbow right to 90°
-        logger.info("Moving elbow RIGHT to 90° (fully right)")
-        logger.info("  - Elbow: 0° → 90°")
-        arm.elbow_right(90, speed=SPEED)
-        wait(DELAY)
-
-        # Elbow back to center
-        logger.info("Moving elbow back to CENTER")
-        logger.info("  - Elbow: 90° → 0°")
-        arm.elbow_center(speed=SPEED)
-        wait(DELAY)
-
-        logger.info("")
-        logger.info("✅ TEST 3 COMPLETE: Elbow range test finished!")
-        logger.info("")
-        wait(2)
-
-        # ================================================================
-        # FINAL: RETURN TO HOME
-        # ================================================================
-        logger.info("=" * 60)
-        logger.info("RETURNING TO HOME POSITION")
-        logger.info("=" * 60)
-        logger.info("")
-
-        arm.home(speed=SPEED, blocking=True)
-        wait(DELAY)
-
-        logger.info("")
-        logger.info("=" * 60)
-        logger.info("✅ ALL TESTS COMPLETE!")
-        logger.info("=" * 60)
-        logger.info("")
-        logger.info("Test Summary:")
-        logger.info("  ✅ Test 1: Full pickup and drop cycle")
-        logger.info("  ✅ Test 2: Shoulder full range (0° to 180°)")
-        logger.info("  ✅ Test 3: Elbow full range (0° to 90°)")
-        logger.info("")
-        logger.info("Arm is now at HOME position (safe)")
-        logger.info("")
-
-        return 0
+    return 0
 
 
 if __name__ == "__main__":
