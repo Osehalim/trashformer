@@ -60,11 +60,9 @@ arm:
   
   # Continuous servo settings (for elbow)
   continuous_servo:
-    stop_pulse: 1500        # Pulse width that stops the servo
-    speed_pulse_range: 100  # ±range from stop for slow movement
-    # Note: You'll need to calibrate these values!
-    # stop_pulse is usually 1500μs but may vary
-    # Try values between 1450-1550μs to find true stop
+    stop_pulse: 1500
+    speed_pulse_range: 120
+    degrees_per_second: 180   
   
   # Movement settings
   movement:
