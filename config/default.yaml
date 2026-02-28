@@ -31,22 +31,22 @@ arm:
   
   # PCA9685 channel assignments
   servo_channels:
-    shoulder: 0
-    elbow: 1
-    gripper: 2
+    shoulder: 0   # Position servo
+    elbow: 1      # CONTINUOUS rotation servo
+    gripper: 2    # Position servo
   
   # Servo angle limits (degrees)
-  # Shoulder: 0° down, 90° horizontal, 180° up
-  # Elbow:    0° center/straight, rotates RIGHT to 90° (LIMITED)
-  # Gripper:  0° open, 90° closed
+  # Shoulder: 0° down, 90° horizontal, 180° up (POSITION SERVO)
+  # Elbow:    0° center/straight, 90° max right (CONTINUOUS SERVO - timed movement)
+  # Gripper:  0° open, 90° closed (POSITION SERVO)
   angle_limits:
     shoulder:
       min: 0
-      max: 180
+      max: 360
       home: 0
     elbow:
       min: 0
-      max: 90        # ← LIMITED to prevent over-rotation
+      max: 90        # Estimated range for continuous servo
       home: 0
     gripper:
       min: 0
@@ -55,8 +55,14 @@ arm:
   
   # PWM pulse width limits (microseconds)
   pwm_limits:
-    min_pulse: 600   # ← Use values from calibration
-    max_pulse: 2400  # ← Use values from calibration
+    min_pulse: 600   # For position servos (shoulder, gripper)
+    max_pulse: 2400  # For position servos (shoulder, gripper)
+  
+  # Continuous servo settings (for elbow)
+  continuous_servo:
+    stop_pulse: 1500
+    speed_pulse_range: 120
+    degrees_per_second: 120   
   
   # Movement settings
   movement:
