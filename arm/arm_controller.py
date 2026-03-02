@@ -305,12 +305,12 @@ class ArmController:
     def home(self, speed: Optional[float] = None, blocking: bool = True) -> bool:
         if "home" in self.poses:
             return self.go_to_pose("home", speed=speed, blocking=blocking)
-        return self.move_to_angles({"shoulder": 0, "elbow": 0, "gripper": 0}, speed=speed, blocking=blocking)
+        return self.move_to_angles({"shoulder": 0, "elbow": 45, "gripper": 0}, speed=speed, blocking=blocking)
 
     def neutral(self, speed: Optional[float] = None, blocking: bool = True) -> bool:
         if "neutral" in self.poses:
             return self.go_to_pose("neutral", speed=speed, blocking=blocking)
-        return self.move_to_angles({"shoulder": 0, "elbow": 0, "gripper": 0}, speed=speed, blocking=blocking)
+        return self.move_to_angles({"shoulder": 0, "elbow": 45, "gripper": 0}, speed=speed, blocking=blocking)
 
     # ---------------- Convenience controls ----------------
 
@@ -325,7 +325,7 @@ class ArmController:
 
     def elbow_center(self, speed: Optional[float] = None) -> bool:
         # 0° = forward/center
-        return self.move_to_angles({"elbow": 0}, speed=speed, blocking=True)
+        return self.move_to_angles({"elbow": 45}, speed=speed, blocking=True)
 
     def elbow_right(self, angle: float = 90, speed: Optional[float] = None) -> bool:
         # RIGHT only; your max is enforced by servo max_angle (from config)
