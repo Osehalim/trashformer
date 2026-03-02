@@ -327,7 +327,7 @@ class ArmController:
         # 0° = forward/center
         return self.move_to_angles({"elbow": 0}, speed=speed, blocking=True)
 
-    def elbow_right(self, angle: float = 45, speed: Optional[float] = None) -> bool:
+    def elbow_right(self, angle: float = 90, speed: Optional[float] = None) -> bool:
         # RIGHT only; your max is enforced by servo max_angle (from config)
         return self.move_to_angles({"elbow": angle}, speed=speed, blocking=True)
 

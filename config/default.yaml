@@ -42,11 +42,11 @@ arm:
   angle_limits:
     shoulder:
       min: 0
-      max: 180
+      max: 360
       home: 0
     elbow:
       min: 0
-      max: 90        # Limited range (can increase if servo allows)
+      max: 180        
       home: 0
     gripper:
       min: 0
