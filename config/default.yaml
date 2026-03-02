@@ -56,7 +56,7 @@ arm:
   # PWM pulse width limits (microseconds)
   # These are starting defaults - calibrate for your specific servos
   pwm_limits:
-    min_pulse: 600    # Minimum pulse width (will be refined by calibration)
+    min_pulse: 1500    # Minimum pulse width (will be refined by calibration)
     max_pulse: 2400   # Maximum pulse width (will be refined by calibration)
   
   # Movement settings
