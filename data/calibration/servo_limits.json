@@ -1,0 +1,20 @@
+{
+  "shoulder": {
+    "min_pulse": 600,
+    "max_pulse": 2400,
+    "offset_deg": 0.0,
+    "invert": false
+  },
+  "elbow": {
+    "min_pulse": 2400,
+    "max_pulse": 1500,
+    "offset_deg": 0.0,
+    "invert": true
+  },
+  "gripper": {
+    "min_pulse": 600,
+    "max_pulse": 2400,
+    "offset_deg": 0.0,
+    "invert": false
+  }
+}

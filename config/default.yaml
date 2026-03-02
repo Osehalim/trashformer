@@ -1,5 +1,6 @@
 # Trashformer Robot - Default Configuration
-# All servos are now POSITION servos (Savox SC-1268SG for shoulder, standard for elbow/gripper)
+# All servos are POSITION servos
+# Elbow servo is INVERTED (increasing pulse turns it the wrong way)
 
 # ============================================================================
 # Robot Identity
@@ -32,21 +33,21 @@ arm:
   # PCA9685 channel assignments
   servo_channels:
     shoulder: 0   # Savox SC-1268SG (high-torque position servo)
-    elbow: 1      # Standard position servo
+    elbow: 1      # Standard position servo (INVERTED)
     gripper: 2    # ServoCity gripper kit (position servo)
   
   # Servo angle limits (degrees)
-  # Shoulder: 0° down, 90° horizontal, 180° up (Savox SC-1268SG)
-  # Elbow:    0° center/straight, 90° max right (standard position servo)
-  # Gripper:  0° open, 90° closed (ServoCity gripper)
+  # Shoulder: 0° down, 90° horizontal, 180° up
+  # Elbow:    0° center/straight, 90° max right (INVERTED SERVO)
+  # Gripper:  0° open, 90° closed
   angle_limits:
     shoulder:
       min: 0
-      max: 360
+      max: 180
       home: 0
     elbow:
       min: 0
-      max: 180        
+      max: 90
       home: 0
     gripper:
       min: 0
@@ -54,16 +55,19 @@ arm:
       home: 0
   
   # PWM pulse width limits (microseconds)
-  # These are starting defaults - calibrate for your specific servos
+  # IMPORTANT: Elbow servo is INVERTED!
+  # - Center (0°) = 1500μs
+  # - Right (90°) = Lower pulse (e.g., 600μs)
+  # So we SWAP min/max to invert the servo
   pwm_limits:
-    min_pulse: 1500    # Minimum pulse width (will be refined by calibration)
-    max_pulse: 2400   # Maximum pulse width (will be refined by calibration)
+    min_pulse: 600    # Used for shoulder/gripper
+    max_pulse: 2400   # Used for shoulder/gripper
   
   # Movement settings
   movement:
     default_speed: 50     # degrees/second
     max_speed: 100        # degrees/second
-    smooth_steps: 10      # interpolation steps per second for smooth movement
+    smooth_steps: 10      # interpolation steps per second
   
   # Physical dimensions (meters)
   dimensions:
