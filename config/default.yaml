@@ -85,8 +85,8 @@ arm:
 # ============================================================================
 drive:
   motor_controller:
-    address: 128
-    timeout: 100
+    left_channel: 4   # PCA9685 channel
+    right_channel: 5  # PCA9685 channel
   
   wheel_diameter: 0.15
   track_width: 0.30
@@ -146,8 +146,20 @@ sensors:
     min_range: 0.02
   
   tof:
-    enabled: false
-    update_rate: 20
+    enabled: true              # ← Enable it
+    update_rate: 20            # Hz
+    sensor_type: "VL53L1X"     # Sensor model
+    i2c_address: 0x29          # Default VL53L1X address
+  
+    # Scanning configuration
+    scan_enabled: true
+    scan_servo_channel: 3      # Extra servo for scanning
+    scan_range: [-90, 90]      # Degrees
+    scan_step: 10              # Degrees per reading
+  
+    # Detection thresholds
+    min_distance: 0.1          # Meters (ignore closer)
+    max_distance: 2.0          # Meters (ignore farther)
   
   limit_switches:
     enabled: true

@@ -36,24 +36,42 @@ class DriveController:
         self.max_linear_speed = float(config.get("drive.max_linear_speed", 1.0))  # m/s
         self.max_angular_speed = float(config.get("drive.max_angular_speed", 2.0))  # rad/s
         
-        # Motor controller - goBILDA
+        # Motor controller - goBILDA 2x40A (via PCA9685 PWM)
         self.motor_controller = None
         
         if not simulate:
-            # Initialize goBILDA motor controller
-            from drive.gobilda_motor_controller import GoBildaMotorController
+            # Initialize goBILDA 2x40A motor controller
+            # Uses same PCA9685 as arm servos, different channels
+            from arm.pca9685_driver import PCA9685
+            from drive.gobilda_motor_controller import GoBilda2x40AController
             
             i2c_bus = int(config.get("hardware.i2c_bus", 1))
-            controller_address = int(config.get("drive.motor_controller.address", 0x10))
+            pca9685_address = int(config.get("hardware.i2c_address", 0x40))
+            pwm_freq = int(config.get("arm.pwm_frequency", 50))
             
-            self.motor_controller = GoBildaMotorController(
+            # Create or reuse PCA9685 instance
+            # Note: If arm is also active, they share the same PCA9685
+            self.pwm = PCA9685(
                 i2c_bus=i2c_bus,
-                address=controller_address,
+                address=pca9685_address,
+                frequency=pwm_freq,
                 simulate=False
             )
-            logger.info("goBILDA motor controller initialized")
+            
+            # Get motor controller channels from config
+            left_channel = int(config.get("drive.motor_controller.left_channel", 4))
+            right_channel = int(config.get("drive.motor_controller.right_channel", 5))
+            
+            self.motor_controller = GoBilda2x40AController(
+                pwm_controller=self.pwm,
+                left_channel=left_channel,
+                right_channel=right_channel,
+                simulate=False
+            )
+            logger.info("goBILDA 2x40A motor controller initialized")
         else:
             logger.warning("DriveController running in SIMULATION mode")
+            self.pwm = None
         
         # State
         self.current_linear_speed = 0.0
