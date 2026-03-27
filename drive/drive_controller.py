@@ -36,22 +36,26 @@ class DriveController:
         self.max_linear_speed = float(config.get("drive.max_linear_speed", 1.0))  # m/s
         self.max_angular_speed = float(config.get("drive.max_angular_speed", 2.0))  # rad/s
         
-        # Motor controller - goBILDA
+        # Motor controller - Dual RoboClaw (left and right tracks)
         self.motor_controller = None
         
         if not simulate:
-            # Initialize goBILDA motor controller
-            from drive.gobilda_motor_controller import GoBildaMotorController
+            # Initialize dual RoboClaw motor controllers
+            from drive.roboclaw_controller import DualRoboClawController
             
-            i2c_bus = int(config.get("hardware.i2c_bus", 1))
-            controller_address = int(config.get("drive.motor_controller.address", 0x10))
+            port = config.get("drive.motor_controller.port", "/dev/ttyS0")
+            baudrate = int(config.get("drive.motor_controller.baudrate", 38400))
+            left_addr = int(config.get("drive.motor_controller.left_address", 0x80))
+            right_addr = int(config.get("drive.motor_controller.right_address", 0x81))
             
-            self.motor_controller = GoBildaMotorController(
-                i2c_bus=i2c_bus,
-                address=controller_address,
+            self.motor_controller = DualRoboClawController(
+                port=port,
+                baudrate=baudrate,
+                left_address=left_addr,
+                right_address=right_addr,
                 simulate=False
             )
-            logger.info("goBILDA motor controller initialized")
+            logger.info("Dual RoboClaw motor controller initialized")
         else:
             logger.warning("DriveController running in SIMULATION mode")
         
@@ -140,15 +144,16 @@ class DriveController:
             time.sleep(duration)
             self.stop()
     
-    def rotate(self, angle_degrees: float, speed: float = 30.0) -> None:
+    def rotate(self, angle_degrees: float, speed: float = 30.0, pivot_style: str = "spin") -> None:
         """
-        Rotate in place by a specific angle.
+        Rotate by a specific angle.
         
         Args:
             angle_degrees: Angle in degrees (positive = left/CCW, negative = right/CW)
             speed: Rotation speed in degrees/second
+            pivot_style: "spin" (both sides move) or "pivot" (one side stationary)
         """
-        logger.info(f"Rotating {angle_degrees:+.1f}° at {speed:.1f}°/s")
+        logger.info(f"Rotating {angle_degrees:+.1f}° at {speed:.1f}°/s (style={pivot_style})")
         
         # Calculate duration
         duration = abs(angle_degrees) / speed if speed > 0 else 0
@@ -160,10 +165,22 @@ class DriveController:
             logger.debug(f"[SIM] Rotate for {duration:.2f}s")
             time.sleep(duration)
         else:
-            # Rotate in place: opposite motor speeds
-            # Left turn: left motor backward, right motor forward
-            motor_speed = 0.3 * direction  # Adjust as needed
-            self.set_motor_speeds(-motor_speed, motor_speed)
+            motor_speed = 0.3  # Base rotation speed
+            
+            if pivot_style == "pivot":
+                # Pivot turn: One side stationary, other side moves
+                # Turn left: right motors forward, left motors stationary
+                # Turn right: left motors forward, right motors stationary
+                if direction > 0:  # Turn left
+                    self.set_motor_speeds(0.0, motor_speed)  # Left=0, Right=forward
+                else:  # Turn right
+                    self.set_motor_speeds(motor_speed, 0.0)  # Left=forward, Right=0
+            else:  # "spin"
+                # Spin turn: Both sides move opposite directions
+                # Turn left: left reverse, right forward
+                # Turn right: left forward, right reverse
+                self.set_motor_speeds(-motor_speed * direction, motor_speed * direction)
+            
             time.sleep(duration)
             self.stop()
     
