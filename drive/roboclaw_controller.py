@@ -7,9 +7,6 @@ For dual RoboClaw setup:
 
 Communication: Serial (UART/TTL)
 Addresses: 0x80 (left), 0x81 (right) - configurable
-
-Requires roboclaw_3 Python library:
-  pip3 install roboclaw_3 --break-system-packages
 """
 
 from __future__ import annotations
@@ -27,9 +24,9 @@ except ImportError:
     try:
         from roboclaw import Roboclaw
         ROBOCLAW_AVAILABLE = True
-    except:
+    except ImportError:
         ROBOCLAW_AVAILABLE = False
-        logger.warning("roboclaw_3 not available - install with: pip3 install roboclaw_3")
+        logger.warning("roboclaw library not available - see setup instructions")
 
 
 class DualRoboClawController:
@@ -60,11 +57,11 @@ class DualRoboClawController:
             return
         
         try:
-            # Create RoboClaw object
+            # Create RoboClaw object (BasicMicro library uses comport, baudrate)
             self.rc = Roboclaw(self.port, self.baudrate)
             self.rc.Open()
             
-            # Verify connection
+            # Verify connection by reading versions
             left_version = self.rc.ReadVersion(self.left_address)
             right_version = self.rc.ReadVersion(self.right_address)
             
@@ -88,22 +85,19 @@ class DualRoboClawController:
     
     def _speed_to_duty(self, speed: float) -> int:
         """
-        Convert speed (-1.0 to 1.0) to RoboClaw duty cycle.
+        Convert speed (-1.0 to 1.0) to RoboClaw duty cycle (0-127).
         
         Args:
             speed: Normalized speed
             
         Returns:
-            Duty cycle value (0-127, with 64 = stopped for mixed mode)
-                             OR (-127 to 127 for individual motor control)
+            Duty cycle value (0-127)
         """
         # Clamp speed
         speed = max(-1.0, min(1.0, float(speed)))
         
-        # Convert to RoboClaw range: 0-127 where 64 = stop
-        # For mixed mode (we'll use individual motor commands instead)
-        # For individual motors: -127 to 127 where 0 = stop
-        duty = int(speed * 127)
+        # Convert to RoboClaw range: 0-127
+        duty = int(abs(speed) * 127)
         
         return duty
     
@@ -123,16 +117,15 @@ class DualRoboClawController:
         if not self.rc:
             return
         
-        # Control both motors on left RoboClaw
-        # M1 and M2 both get same command
-        if duty >= 0:
+        # Control both motors on left RoboClaw (M1 and M2)
+        if speed >= 0:
             # Forward
             self.rc.ForwardM1(self.left_address, duty)
             self.rc.ForwardM2(self.left_address, duty)
         else:
             # Backward
-            self.rc.BackwardM1(self.left_address, abs(duty))
-            self.rc.BackwardM2(self.left_address, abs(duty))
+            self.rc.BackwardM1(self.left_address, duty)
+            self.rc.BackwardM2(self.left_address, duty)
     
     def set_right_motors(self, speed: float) -> None:
         """
@@ -151,14 +144,14 @@ class DualRoboClawController:
             return
         
         # Control both motors on right RoboClaw
-        if duty >= 0:
+        if speed >= 0:
             # Forward
             self.rc.ForwardM1(self.right_address, duty)
             self.rc.ForwardM2(self.right_address, duty)
         else:
             # Backward
-            self.rc.BackwardM1(self.right_address, abs(duty))
-            self.rc.BackwardM2(self.right_address, abs(duty))
+            self.rc.BackwardM1(self.right_address, duty)
+            self.rc.BackwardM2(self.right_address, duty)
     
     def set_motors(self, left_speed: float, right_speed: float) -> None:
         """
