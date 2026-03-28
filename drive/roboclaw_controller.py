@@ -21,7 +21,7 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 try:
-    from roboclaw_3 import Roboclaw
+    from roboclaw import Roboclaw
     ROBOCLAW_AVAILABLE = True
 except ImportError:
     ROBOCLAW_AVAILABLE = False
