@@ -38,7 +38,7 @@ class DualRoboClawController:
     
     def __init__(
         self,
-        port: str = "/dev/ttyS0",
+        port: str = "/dev/ttyAMA0",
         baudrate: int = 38400,
         left_address: int = 0x80,   # 128
         right_address: int = 0x81,  # 129
