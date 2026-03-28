@@ -21,11 +21,15 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 try:
-    from roboclaw import Roboclaw
+    from drive.roboclaw import Roboclaw
     ROBOCLAW_AVAILABLE = True
 except ImportError:
-    ROBOCLAW_AVAILABLE = False
-    logger.warning("roboclaw_3 not available - install with: pip3 install roboclaw_3")
+    try:
+        from roboclaw import Roboclaw
+        ROBOCLAW_AVAILABLE = True
+    except:
+        ROBOCLAW_AVAILABLE = False
+        logger.warning("roboclaw_3 not available - install with: pip3 install roboclaw_3")
 
 
 class DualRoboClawController:
