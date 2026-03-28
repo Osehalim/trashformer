@@ -18,7 +18,7 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 try:
-    from drive.roboclaw import Roboclaw
+    from drive.roboclaw_3 import Roboclaw
     ROBOCLAW_AVAILABLE = True
 except ImportError:
     try:
@@ -38,7 +38,7 @@ class DualRoboClawController:
     
     def __init__(
         self,
-        port: str = "/dev/ttyS0",
+        port: str = "/dev/ttyAMA0",
         baudrate: int = 38400,
         left_address: int = 0x80,   # 128
         right_address: int = 0x81,  # 129
