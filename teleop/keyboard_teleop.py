@@ -104,14 +104,12 @@ class KeyboardTeleop:
             self.drive.drive_velocity(-self.linear_speed, 0.0)
         
         elif key == 'a' or key == 'A':
-            # Turn left (arc)
-            logger.info("Turn left")
-            self.drive.drive_velocity(self.linear_speed * 0.5, self.angular_speed)
-        
+            logger.info("Turn left (skid steer)")
+            self.drive.set_motor_speeds(1.0, -1.0)
+
         elif key == 'd' or key == 'D':
-            # Turn right (arc)
-            logger.info("Turn right")
-            self.drive.drive_velocity(self.linear_speed * 0.5, -self.angular_speed)
+            logger.info("Turn right (skid steer)")
+            self.drive.set_motor_speeds(-1.0, 1.0)
         
         elif key == 'q' or key == 'Q':
             # Rotate left (in place)
