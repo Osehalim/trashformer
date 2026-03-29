@@ -41,7 +41,7 @@ class KeyboardTeleop:
         self.drive = DriveController(config=config, simulate=simulate)
         
         # Control settings
-        self.linear_speed = 0.3    # m/s
+        self.linear_speed = 0.05    # m/s
         self.angular_speed = 0.5   # rad/s
         self.speed_increment = 0.1
         
