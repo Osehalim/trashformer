@@ -3,6 +3,11 @@ drive/drive_controller.py - Basic robot drive control
 
 Controls robot movement using motor controller.
 Supports differential drive (left/right motors).
+
+Hardware:
+- Motor controller (e.g., Sabertooth, Roboclaw, L298N)
+- 2 motors (left and right)
+- Wheel encoders (optional, for odometry)
 """
 
 from __future__ import annotations
@@ -47,12 +52,6 @@ class DriveController:
 
             # UART fallback/defaults
             port = config.get("drive.motor_controller.port", "/dev/ttyAMA0")
-            
-            # Motor inversions (for backwards-wired motors)
-            invert_left_m1 = bool(config.get("drive.motor_controller.invert_left_m1", False))
-            invert_left_m2 = bool(config.get("drive.motor_controller.invert_left_m2", True))
-            invert_right_m1 = bool(config.get("drive.motor_controller.invert_right_m1", False))
-            invert_right_m2 = bool(config.get("drive.motor_controller.invert_right_m2", True))
 
             self.motor_controller = DualRoboClawController(
                 mode=controller_mode,
@@ -62,10 +61,6 @@ class DriveController:
                 baudrate=baudrate,
                 left_address=left_addr,
                 right_address=right_addr,
-                invert_left_m1=invert_left_m1,
-                invert_left_m2=invert_left_m2,
-                invert_right_m1=invert_right_m1,
-                invert_right_m2=invert_right_m2,
                 simulate=False,
             )
             logger.info(f"Dual RoboClaw motor controller initialized in {controller_mode.upper()} mode")
@@ -226,3 +221,24 @@ class DriveController:
 
     def __repr__(self) -> str:
         return f"DriveController(wheel={self.wheel_diameter}m, track={self.track_width}m)"
+
+
+if __name__ == "__main__":
+    from utils.logger import setup_logging
+    from utils.config_loader import load_config
+
+    setup_logging()
+
+    logger.info("Testing DriveController (simulation)")
+    cfg = load_config("config/default.yaml")
+
+    with DriveController(config=cfg, simulate=True) as drive:
+        logger.info(f"{drive}")
+
+        drive.forward(1.0, speed=0.3)
+        drive.rotate(90)
+        drive.forward(0.5, speed=0.3)
+        drive.rotate(-90)
+        drive.backward(0.5, speed=0.3)
+
+        logger.info("Simulation test complete")
