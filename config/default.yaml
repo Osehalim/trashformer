@@ -85,10 +85,12 @@ arm:
 # ============================================================================
 drive:
   motor_controller:
-    port: "/dev/ttyAMA0"        # Serial port
+    mode: "usb"
+    left_port: "/dev/ttyACM0"
+    right_port: "/dev/ttyACM1"
     baudrate: 38400
-    left_address: 0x80        # Left tracks
-    right_address: 0x81       # Right tracks
+    left_address: 0x80
+    right_address: 0x80
   
   wheel_diameter: 0.15
   track_width: 0.30

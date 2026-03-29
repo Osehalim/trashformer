@@ -139,6 +139,11 @@ class Servo:
         if speed is None or self._current_angle is None:
             return self.set_angle(target, validate=False)
 
+        # If non-blocking, just command final position immediately
+        # (no true background motion implemented here)
+        if not blocking:
+            return self.set_angle(target, validate=False)
+
         start = float(self._current_angle)
         delta = target - start
         if abs(delta) < 0.5:
@@ -160,13 +165,13 @@ class Servo:
             t = i / steps
             a = start + delta * t
             self.set_angle(a, validate=False)
-            if blocking and i < steps:
+            if i < steps:
                 time.sleep(step_delay)
 
         self._current_angle = target
         self._target_angle = target
         return True
-
+    
     def home(self, speed: Optional[float] = None, blocking: bool = True) -> bool:
         return self.move_to(self.home_angle, speed, blocking)
 

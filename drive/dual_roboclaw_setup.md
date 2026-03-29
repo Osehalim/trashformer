@@ -1,167 +1,188 @@
-"""
-DUAL ROBOCLAW SETUP GUIDE
-==========================
+# DUAL ROBOCLAW USB SETUP GUIDE
 
 Hardware: 2x RoboClaw motor controllers + goBILDA Servo PDB
 - RoboClaw 1: Left tracks (2 motors)
 - RoboClaw 2: Right tracks (2 motors)
 - Servo PDB: Power distribution only
+- Raspberry Pi connects to each RoboClaw by USB
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-WIRING DIAGRAM
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---
 
+## WIRING DIAGRAM
+
+```text
 ┌─────────────────────────────────────────────────────────────────┐
-│  Raspberry Pi 4                                                 │
+│  Raspberry Pi                                                  │
 │                                                                 │
-│  GPIO 14 (TX) ──┬──→ RoboClaw 1 S1 (RX)                       │
-│                 └──→ RoboClaw 2 S1 (RX)                       │
-│                                                                 │
-│  GPIO 15 (RX) ──┬──← RoboClaw 1 S2 (TX)                       │
-│                 └──← RoboClaw 2 S2 (TX)                       │
-│                                                                 │
-│  GND ───────────┴──→ RoboClaw 1 & 2 GND                       │
+│  USB Port 1 ─────────────→ RoboClaw 1 micro-USB               │
+│  USB Port 2 ─────────────→ RoboClaw 2 micro-USB               │
 └─────────────────────────────────────────────────────────────────┘
                   │
                   ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│  RoboClaw 1 (Left Tracks) - Address 0x80                       │
+│  RoboClaw 1 (Left Tracks)                                      │
 │                                                                 │
 │  M1 ──→ Left Front Motor                                       │
 │  M2 ──→ Left Rear Motor                                        │
-│                                                                 │
 │  B+ / B- ← Battery (via PDB)                                   │
-│  S1 (RX) ← Pi GPIO 14 (TX)                                     │
-│  S2 (TX) → Pi GPIO 15 (RX)                                     │
-│  GND ← Pi GND                                                  │
+│  USB ← Pi USB port                                             │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│  RoboClaw 2 (Right Tracks) - Address 0x81                      │
+│  RoboClaw 2 (Right Tracks)                                     │
 │                                                                 │
 │  M1 ──→ Right Front Motor                                      │
 │  M2 ──→ Right Rear Motor                                       │
-│                                                                 │
 │  B+ / B- ← Battery (via PDB)                                   │
-│  S1 (RX) ← Pi GPIO 14 (TX)                                     │
-│  S2 (TX) → Pi GPIO 15 (RX)                                     │
-│  GND ← Pi GND                                                  │
+│  USB ← Pi USB port                                             │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
 │  goBILDA Servo PDB (Power Distribution Board)                  │
 │                                                                 │
 │  Battery Input ← Main battery                                  │
-│  Output 1 → RoboClaw 1 (B+/B-)                                │
-│  Output 2 → RoboClaw 2 (B+/B-)                                │
-│  5V/6V Outputs → Servos (arm control)                         │
+│  Output 1 → RoboClaw 1 (B+/B-)                                 │
+│  Output 2 → RoboClaw 2 (B+/B-)                                 │
+│  5V/6V Outputs → Servos (arm control)                          │
 └─────────────────────────────────────────────────────────────────┘
+```
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ROBOCLAW CONFIGURATION (Motion Studio)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---
 
-Connect each RoboClaw to computer via USB and configure:
+## IMPORTANT NOTES
 
-RoboClaw 1 (Left):
-  General Settings:
-    - Control Mode: Packet Serial
-    - Multi-Unit Mode: ENABLED ✓
-  
-  Serial Settings:
-    - Address: 128 (0x80)
-    - Baudrate: 38400
-  
-  Motor Settings:
-    - M1 & M2: Direction as needed for left tracks
+- USB is for communication only.
+- Motors still need external battery power through B+/B-.
+- You do not need Pi TX/RX GPIO wiring in USB mode.
+- Each RoboClaw shows up as its own serial device, usually `/dev/ttyACM0` and `/dev/ttyACM1`.
+- On USB, the controllers are physically separate, so using the same address on both is fine. This code still allows separate addresses if you want them.
 
-RoboClaw 2 (Right):
-  General Settings:
-    - Control Mode: Packet Serial
-    - Multi-Unit Mode: ENABLED ✓
-  
-  Serial Settings:
-    - Address: 129 (0x81)
-    - Baudrate: 38400
-  
-  Motor Settings:
-    - M1 & M2: Direction as needed for right tracks
+---
 
-CRITICAL: Both RoboClaws must have different addresses!
+## ROBOCLAW CONFIGURATION (Motion Studio)
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-RASPBERRY PI CONFIGURATION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Connect each RoboClaw to a computer via USB and configure:
 
-1. ENABLE SERIAL PORT:
-   sudo raspi-config
-   → Interface Options
-   → Serial Port
-   → "Would you like a login shell accessible over serial?" NO
-   → "Would you like the serial port hardware enabled?" YES
-   
-2. DISABLE BLUETOOTH (frees up /dev/ttyAMA0):
-   sudo nano /boot/config.txt
-   Add: dtoverlay=disable-bt
-   sudo systemctl disable hciuart
-   sudo reboot
+### RoboClaw 1 (Left)
+- Control Mode: Packet Serial
+- Baudrate: 38400
+- Address: 128 (0x80)
 
-3. INSTALL ROBOCLAW LIBRARY:
-   pip3 install roboclaw_3 --break-system-packages
+### RoboClaw 2 (Right)
+- Control Mode: Packet Serial
+- Baudrate: 38400
+- Address: 128 (0x80) or 129 (0x81)
 
-4. TEST SERIAL PORT:
-   ls -l /dev/ttyS0  # Should exist
-   ls -l /dev/ttyAMA0  # Should exist after disabling BT
+Recommended for this code:
+- Left address: `0x80`
+- Right address: `0x80`
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-WIRING DETAILS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+If you prefer unique addresses, that also works.
 
-Serial Connection (Multi-Unit Mode):
-  Pi GPIO 14 (TX) ─┬─→ RoboClaw 1 S1
-                   └─→ RoboClaw 2 S1
-  
-  Pi GPIO 15 (RX) ─┬─← RoboClaw 1 S2
-                   └─← RoboClaw 2 S2
-  
-  Pi GND ──────────┴─→ Both RoboClaw GNDs
+---
 
-Motor Connections:
-  Left RoboClaw (0x80):
-    M1A/M1B → Left Front Motor
-    M2A/M2B → Left Rear Motor
-  
-  Right RoboClaw (0x81):
-    M1A/M1B → Right Front Motor
-    M2A/M2B → Right Rear Motor
+## RASPBERRY PI CONFIGURATION
 
-Power:
-  Battery → PDB → RoboClaws B+/B-
-  Common ground between all components!
+### 1. Install RoboClaw library
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-TESTING
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```bash
+pip3 install roboclaw_3 --break-system-packages
+```
 
-1. TEST ROBOCLAW CONNECTION:
-   cd ~/trashformer
-   python3 -c "
+### 2. Plug in both controllers
+
+Then check:
+
+```bash
+ls /dev/ttyACM*
+```
+
+Expected result:
+
+```bash
+/dev/ttyACM0
+/dev/ttyACM1
+```
+
+### 3. Optional: identify which is left and right
+
+```bash
+dmesg | grep ttyACM
+```
+
+If the ports swap after reboot, use udev rules later for fixed names.
+
+---
+
+## CONFIGURATION FILE
+
+Update `config/default.yaml` like this:
+
+```yaml
+drive:
+  motor_controller:
+    mode: "usb"
+    left_port: "/dev/ttyACM0"
+    right_port: "/dev/ttyACM1"
+    baudrate: 38400
+    left_address: 0x80
+    right_address: 0x80
+```
+
+If you decide to keep different addresses:
+
+```yaml
+drive:
+  motor_controller:
+    mode: "usb"
+    left_port: "/dev/ttyACM0"
+    right_port: "/dev/ttyACM1"
+    baudrate: 38400
+    left_address: 0x80
+    right_address: 0x81
+```
+
+---
+
+## TESTING
+
+### 1. Test RoboClaw connection
+
+```bash
+cd ~/trashformer
+python3 -c "
 from drive.roboclaw_controller import DualRoboClawController
 import time
 
-rc = DualRoboClawController(port='/dev/ttyS0', baudrate=38400, simulate=False)
+rc = DualRoboClawController(
+    mode='usb',
+    left_port='/dev/ttyACM0',
+    right_port='/dev/ttyACM1',
+    left_address=0x80,
+    right_address=0x80,
+    baudrate=38400,
+    simulate=False,
+)
 time.sleep(1)
 rc.close()
 "
+```
 
-   Expected: See firmware versions for both RoboClaws
+Expected: see firmware version logs for both controllers.
 
-2. TEST MOTORS (robot on blocks!):
-   python3 -c "
+### 2. Test motors (robot on blocks)
+
+```bash
+python3 -c "
 from drive.roboclaw_controller import DualRoboClawController
 import time
 
-rc = DualRoboClawController(simulate=False)
+rc = DualRoboClawController(
+    mode='usb',
+    left_port='/dev/ttyACM0',
+    right_port='/dev/ttyACM1',
+    simulate=False,
+)
 
 print('Forward')
 rc.set_motors(0.3, 0.3)
@@ -179,76 +200,61 @@ print('Stop')
 rc.stop()
 rc.close()
 "
+```
 
-3. TEST WITH KEYBOARD TELEOP:
-   cd ~/trashformer/tools
-   python3 teleop_keyboard.py
+### 3. Test with keyboard teleop
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-MOVEMENT LOGIC
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```bash
+cd ~/trashformer/tools
+python3 teleop_keyboard.py
+```
 
-Forward (all 4 motors ON):
-  Left RoboClaw:  M1 forward, M2 forward
-  Right RoboClaw: M1 forward, M2 forward
-  Result: All 4 motors drive forward ✓
+---
 
-Backward (all 4 motors ON):
-  Left RoboClaw:  M1 reverse, M2 reverse
-  Right RoboClaw: M1 reverse, M2 reverse
-  Result: All 4 motors drive backward ✓
+## MOVEMENT LOGIC
 
-Turn Left (differential):
-  Left RoboClaw:  M1 reverse, M2 reverse
-  Right RoboClaw: M1 forward, M2 forward
-  Result: Left tracks reverse, right tracks forward → Turn left ↺
+### Forward
+- Left RoboClaw: M1 forward, M2 forward
+- Right RoboClaw: M1 forward, M2 forward
+- Result: all 4 motors drive forward
 
-Turn Right (differential):
-  Left RoboClaw:  M1 forward, M2 forward
-  Right RoboClaw: M1 reverse, M2 reverse
-  Result: Left tracks forward, right tracks reverse → Turn right ↻
+### Backward
+- Left RoboClaw: M1 reverse, M2 reverse
+- Right RoboClaw: M1 reverse, M2 reverse
+- Result: all 4 motors drive backward
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CONFIGURATION FILE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### Turn Left
+- Left RoboClaw: M1 reverse, M2 reverse
+- Right RoboClaw: M1 forward, M2 forward
+- Result: left tracks reverse, right tracks forward
 
-config/default.yaml:
+### Turn Right
+- Left RoboClaw: M1 forward, M2 forward
+- Right RoboClaw: M1 reverse, M2 reverse
+- Result: left tracks forward, right tracks reverse
 
-drive:
-  motor_controller:
-    port: "/dev/ttyS0"        # or /dev/ttyAMA0
-    baudrate: 38400
-    left_address: 0x80        # 128
-    right_address: 0x81       # 129
+---
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-TROUBLESHOOTING
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## TROUBLESHOOTING
 
-Problem: "Failed to connect to RoboClaw"
-→ Check serial wiring (TX → RX, RX → TX)
-→ Verify baudrate matches (38400)
-→ Check addresses (0x80, 0x81)
-→ Ensure Multi-Unit mode enabled
-→ Try /dev/ttyAMA0 instead of /dev/ttyS0
+### Problem: one controller does not connect
+- Check the USB cable.
+- Check `ls /dev/ttyACM*`.
+- Verify the RoboClaw is powered.
+- Confirm baudrate matches Motion Studio.
+- Try swapping cables and USB ports.
 
-Problem: Motors don't move
-→ Check motor power (B+/B-)
-→ Verify motor connections
-→ Check for error LEDs on RoboClaw
-→ Test each RoboClaw independently
+### Problem: ports swap after reboot
+- This is common with `/dev/ttyACM0` and `/dev/ttyACM1`.
+- Use udev rules for fixed names later, such as `/dev/roboclaw_left` and `/dev/roboclaw_right`.
 
-Problem: Wrong motor direction
-→ Swap motor wires (M1A ↔ M1B)
-→ OR change direction in Motion Studio
-→ OR invert in code (multiply speed by -1)
+### Problem: motors do not move
+- Check battery power on B+/B-.
+- Verify motor wiring.
+- Check error LEDs on RoboClaw.
+- Test each controller separately.
 
-Problem: Only one RoboClaw works
-→ Check addresses are different (0x80 vs 0x81)
-→ Verify both connected to serial bus
-→ Check ground connections
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"""
-
-print(__doc__)
+### Problem: wrong motor direction
+- Swap motor wires (M1A ↔ M1B).
+- Or change motor direction in Motion Studio.
+- Or invert speed in code.
