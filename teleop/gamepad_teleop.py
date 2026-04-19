@@ -167,7 +167,12 @@ class GamepadTeleop:
         try:
             while self.running:
                 # Read gamepad events
-                events = get_gamepad()
+                from inputs import devices
+
+                gamepad = devices.gamepads[0]
+
+                while self.running:
+                    events = gamepad.read()
                 
                 for event in events:
                     self.process_gamepad_event(event)
