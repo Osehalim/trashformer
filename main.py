@@ -76,7 +76,7 @@ class RobotController:
         
         self.initialize_drive()
         
-        from tools.keyboard_teleop import KeyboardTeleop
+        from teleop.keyboard_teleop import KeyboardTeleop
         
         with KeyboardTeleop(config=self.config, simulate=False) as teleop:
             teleop.run()
@@ -100,7 +100,7 @@ class RobotController:
             logger.info("Install with: pip3 install inputs --break-system-packages")
             return
         
-        from tools.teleop_gamepad import GamepadTeleop
+        from teleop.teleop_gamepad import GamepadTeleop
         
         with GamepadTeleop(config=self.config, simulate=False) as teleop:
             teleop.run()
