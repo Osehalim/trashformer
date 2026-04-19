@@ -4,11 +4,19 @@ teleop/teleop_gamepad.py
 
 Control robot with a gamepad using pygame.
 
-Debug version using PS5 face buttons:
-  Triangle: Forward
-  Cross: Backward
-  Square: Turn left
-  Circle: Turn right
+PS5 controller mapping on this Raspberry Pi:
+  Left stick X: axis 0
+  Left stick Y: axis 1
+  Right stick X: axis 3
+  Right stick Y: axis 4
+
+Controls:
+  Left stick: Drive forward/backward + turn
+  Right stick X: Rotate in place
+  Triangle: Forward (backup/debug)
+  Cross: Backward (backup/debug)
+  Square: Turn left (backup/debug)
+  Circle: Turn right (backup/debug)
   Start / Options: Stop
 
 Usage:
@@ -29,8 +37,6 @@ logger = get_logger(__name__)
 class GamepadTeleop:
     """
     Gamepad teleoperation using pygame.
-
-    Debug version that uses buttons instead of joysticks.
     """
 
     def __init__(self, config, simulate: bool = False):
@@ -38,23 +44,22 @@ class GamepadTeleop:
         self.simulate = simulate
         self.drive = DriveController(config=config, simulate=simulate)
 
-        # Movement speed for button control
-        self.move_speed = 0.3
+        # Speed settings
+        self.max_linear_speed = 0.35   # m/s
+        self.max_angular_speed = 0.8   # rad/s
+        self.button_turn_speed = 0.25
+        self.deadzone = 0.15
+        self.loop_delay = 0.05
 
-        # Polling loop delay
-        self.loop_delay = 0.05  # seconds
-
-        # Running state
         self.running = True
 
-        # Button mapping (common PS5 pygame mapping)
+        # Button mapping for PS5 controller
         self.cross_button = 0
         self.circle_button = 1
         self.triangle_button = 2
         self.square_button = 3
-        self.start_button = 9   # sometimes Options/Start may vary
+        self.start_button = 9   # if this doesn't work, try 10
 
-        # Initialize pygame + joystick
         pygame.init()
         pygame.joystick.init()
 
@@ -67,48 +72,69 @@ class GamepadTeleop:
 
         logger.info("Gamepad teleop initialized")
         logger.info(f"Connected joystick: {self.joystick.get_name()}")
-        logger.info(f"Buttons: {self.joystick.get_numbuttons()}")
-        logger.info(f"Move speed: {self.move_speed}")
+        logger.info(f"Axes: {self.joystick.get_numaxes()}, Buttons: {self.joystick.get_numbuttons()}")
+
+    def apply_deadzone(self, value: float) -> float:
+        if abs(value) < self.deadzone:
+            return 0.0
+        if value > 0:
+            return (value - self.deadzone) / (1.0 - self.deadzone)
+        return (value + self.deadzone) / (1.0 - self.deadzone)
+
+    def get_axis_safe(self, axis_index: int) -> float:
+        if axis_index < self.joystick.get_numaxes():
+            return self.joystick.get_axis(axis_index)
+        return 0.0
 
     def get_button_safe(self, button_index: int) -> int:
-        """
-        Safely read a joystick button.
-
-        Args:
-            button_index: Button number
-
-        Returns:
-            Button state, or 0 if button does not exist
-        """
         if button_index < self.joystick.get_numbuttons():
             return self.joystick.get_button(button_index)
         return 0
 
     def print_instructions(self) -> None:
-        """
-        Print controller instructions.
-        """
         print("\n" + "=" * 60)
-        print("GAMEPAD TELEOPERATION (BUTTON DEBUG MODE)")
+        print("GAMEPAD TELEOPERATION")
         print("=" * 60)
         print()
         print(f"Connected controller: {self.joystick.get_name()}")
         print()
-        print("Controls:")
+        print("Stick controls:")
+        print("  Left stick: Drive and turn")
+        print("  Right stick X: Rotate in place")
+        print()
+        print("Button controls (backup/debug):")
         print("  Triangle: Forward")
         print("  Cross: Backward")
         print("  Square: Turn left")
         print("  Circle: Turn right")
         print("  Start / Options: Stop")
         print()
-        print(f"Move speed: {self.move_speed:.2f}")
+        print(f"Max linear speed:  {self.max_linear_speed:.2f} m/s")
+        print(f"Max angular speed: {self.max_angular_speed:.2f} rad/s")
         print("=" * 60)
         print()
 
+    def update_motors_from_sticks(self) -> None:
+        # Confirmed mapping for your controller
+        left_x = self.get_axis_safe(0)
+        left_y = -self.get_axis_safe(1)   # invert so up = forward
+        right_x = self.get_axis_safe(3)
+
+        forward = self.apply_deadzone(left_y)
+        turn = self.apply_deadzone(left_x)
+        rotate = self.apply_deadzone(right_x)
+
+        # Right stick rotation gets priority
+        if abs(rotate) > 0.05:
+            linear = 0.0
+            angular = rotate * self.max_angular_speed
+        else:
+            linear = forward * self.max_linear_speed
+            angular = turn * self.max_angular_speed
+
+        self.drive.drive_velocity(linear, angular)
+
     def run(self) -> None:
-        """
-        Main teleoperation loop.
-        """
         self.print_instructions()
         logger.info("Waiting for gamepad input...")
 
@@ -122,29 +148,29 @@ class GamepadTeleop:
                 square = self.get_button_safe(self.square_button)
                 start = self.get_button_safe(self.start_button)
 
-                if triangle:
-                    logger.info("Forward")
-                    self.drive.set_motor_speeds(self.move_speed, self.move_speed)
-
-                elif cross:
-                    logger.info("Backward")
-                    self.drive.set_motor_speeds(-self.move_speed, -self.move_speed)
-
-                elif square:
-                    logger.info("Turn left")
-                    self.drive.set_motor_speeds(self.move_speed, -self.move_speed)
-
-                elif circle:
-                    logger.info("Turn right")
-                    self.drive.set_motor_speeds(-self.move_speed, self.move_speed)
-
-                elif start:
+                # Stop button always has priority
+                if start:
                     logger.info("STOP")
                     self.drive.stop()
+                    time.sleep(0.1)
+                    continue
+
+                # Backup/debug button controls
+                if triangle:
+                    self.drive.set_motor_speeds(self.button_turn_speed, self.button_turn_speed)
+
+                elif cross:
+                    self.drive.set_motor_speeds(-self.button_turn_speed, -self.button_turn_speed)
+
+                elif square:
+                    self.drive.set_motor_speeds(self.button_turn_speed, -self.button_turn_speed)
+
+                elif circle:
+                    self.drive.set_motor_speeds(-self.button_turn_speed, self.button_turn_speed)
 
                 else:
-                    # No button pressed -> stop
-                    self.drive.stop()
+                    # Normal stick control
+                    self.update_motors_from_sticks()
 
                 time.sleep(self.loop_delay)
 
@@ -158,9 +184,6 @@ class GamepadTeleop:
             self.cleanup()
 
     def cleanup(self) -> None:
-        """
-        Stop motors and clean up.
-        """
         logger.info("Cleaning up...")
         self.drive.stop()
         self.drive.close()
