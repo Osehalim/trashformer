@@ -87,21 +87,45 @@ class RobotController:
         
         self.initialize_drive()
         
-        # Check if gamepad is connected
+        # Check if gamepad is connected using pygame
         try:
-            from inputs import devices
-            if not devices.gamepads:
+            import pygame
+            pygame.init()
+            pygame.joystick.init()
+            
+            joystick_count = pygame.joystick.get_count()
+            
+            if joystick_count == 0:
                 logger.error("No gamepad detected!")
                 logger.info("Connect your PS5 controller via Bluetooth")
-                logger.info("Run: bluetoothctl -> connect <MAC_ADDRESS>")
-                return
+                logger.info("Check: ls /dev/input/js*")
+                
+                # Wait a bit for controller to connect
+                logger.info("Waiting 30 seconds for gamepad...")
+                for i in range(30):
+                    pygame.joystick.quit()
+                    pygame.joystick.init()
+                    if pygame.joystick.get_count() > 0:
+                        logger.info(f"✓ Gamepad detected after {i+1} seconds!")
+                        joystick_count = pygame.joystick.get_count()
+                        break
+                    time.sleep(1)
+                else:
+                    logger.error("No gamepad found after 30 seconds")
+                    pygame.quit()
+                    return
+            
+            logger.info(f"✓ Found {joystick_count} gamepad(s)")
+            pygame.quit()  # Clean up before GamepadTeleop initializes its own
+            
         except ImportError:
-            logger.error("'inputs' library not installed")
-            logger.info("Install with: pip3 install inputs --break-system-packages")
+            logger.error("'pygame' library not installed")
+            logger.info("Install with: pip3 install pygame --break-system-packages")
             return
         
-        from teleop.teleop_gamepad import GamepadTeleop
+        from teleop.gamepad_teleop import GamepadTeleop
         
+        logger.info("Starting gamepad control...")
         with GamepadTeleop(config=self.config, simulate=False) as teleop:
             teleop.run()
     
