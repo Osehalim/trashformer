@@ -121,8 +121,8 @@ class GamepadTeleop:
         right_x = self.get_axis_safe(3)     # Right stick left/right
 
         # Apply deadzones
-        forward = self.apply_deadzone(left_y)    # Forward/backward
-        turn = self.apply_deadzone(left_x)       # Turn left/right
+        forward = self.apply_deadzone(left_x)    # Forward/backward
+        turn = self.apply_deadzone(left_y)       # Turn left/right
         rotate = self.apply_deadzone(right_x)    # Rotate in place
 
         # Right stick rotation gets priority
