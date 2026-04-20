@@ -116,23 +116,33 @@ class GamepadTeleop:
 
     def update_motors_from_sticks(self) -> None:
         # Confirmed mapping for your controller
-        left_x = self.get_axis_safe(0)
-        left_y = -self.get_axis_safe(1)   # invert so up = forward
-        right_x = self.get_axis_safe(3)
+        left_x = self.get_axis_safe(0)      # Left stick left/right
+        left_y = -self.get_axis_safe(1)     # Left stick up/down (inverted)
+        right_x = self.get_axis_safe(3)     # Right stick left/right
 
-        forward = self.apply_deadzone(left_y)
-        turn = self.apply_deadzone(left_x)
-        rotate = self.apply_deadzone(right_x)
+        # Apply deadzones
+        forward = self.apply_deadzone(left_y)    # Forward/backward
+        turn = self.apply_deadzone(left_x)       # Turn left/right
+        rotate = self.apply_deadzone(right_x)    # Rotate in place
 
         # Right stick rotation gets priority
         if abs(rotate) > 0.05:
-            linear = 0.0
-            angular = rotate * self.max_angular_speed
+            # Pure rotation - both motors opposite directions
+            left_motor = -rotate
+            right_motor = rotate
         else:
-            linear = forward * self.max_linear_speed
-            angular = turn * self.max_angular_speed
-
-        self.drive.drive_velocity(linear, angular)
+            # Normal driving - combine forward and turn
+            # Forward: both motors same speed
+            # Turn: differential speed between left and right
+            left_motor = forward - turn
+            right_motor = forward + turn
+        
+        # Clamp to -1.0 to 1.0
+        left_motor = max(-1.0, min(1.0, left_motor))
+        right_motor = max(-1.0, min(1.0, right_motor))
+        
+        # Send to motors
+        self.drive.set_motor_speeds(left_motor, right_motor)
 
     def run(self) -> None:
         self.print_instructions()
