@@ -45,10 +45,10 @@ class GamepadTeleop:
         self.drive = DriveController(config=config, simulate=simulate)
 
         # Speed settings
-        self.max_linear_speed = 0.35   # m/s
-        self.max_angular_speed = 0.8   # rad/s
-        self.button_turn_speed = 0.25
-        self.deadzone = 0.15
+        self.max_linear_speed = 1.0   # m/s
+        self.max_angular_speed = 1.0   # rad/s
+        self.button_turn_speed = 0.50
+        self.deadzone = 0.25
         self.loop_delay = 0.05
 
         self.running = True

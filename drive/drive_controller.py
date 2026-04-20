@@ -189,6 +189,9 @@ class DriveController:
             self.stop()
 
     def drive_velocity(self, linear: float, angular: float) -> None:
+        # Flip linear direction to match this robot's motor/controller orientation
+        linear = -linear
+
         v_left = linear - (angular * self.track_width / 2)
         v_right = linear + (angular * self.track_width / 2)
 
