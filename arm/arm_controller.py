@@ -347,6 +347,28 @@ class ArmController:
     def set_gripper(self, angle: float, speed: Optional[float] = None) -> bool:
         return self.move_to_angles({"gripper": angle}, speed=speed, blocking=True)
 
+    # ---------------- Simple interface (aliases) ----------------
+    
+    def gripper_open(self, speed: Optional[float] = None) -> bool:
+        """Alias for open_gripper()"""
+        return self.open_gripper(speed=speed)
+    
+    def gripper_close(self, speed: Optional[float] = None) -> bool:
+        """Alias for close_gripper()"""
+        return self.close_gripper(speed=speed)
+    
+    def move_shoulder(self, angle: float, speed: Optional[float] = None) -> bool:
+        """Move shoulder to specific angle (0=down, 90=horizontal, 180=up)"""
+        return self.move_to_angles({"shoulder": angle}, speed=speed, blocking=True)
+    
+    def move_elbow(self, angle: float, speed: Optional[float] = None) -> bool:
+        """Move elbow to specific angle (0=center/forward, max=full right)"""
+        return self.move_to_angles({"elbow": angle}, speed=speed, blocking=True)
+    
+    def move_gripper(self, angle: float, speed: Optional[float] = None) -> bool:
+        """Move gripper to specific angle (0=open, 90=closed)"""
+        return self.set_gripper(angle, speed=speed)
+
     # ---------------- Utilities ----------------
 
     def list_poses(self) -> List[str]:
