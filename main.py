@@ -90,30 +90,36 @@ class RobotController:
         # Check if gamepad is connected using pygame
         try:
             import pygame
-            pygame.init()
-            pygame.joystick.init()
             
-            joystick_count = pygame.joystick.get_count()
+            logger.info("Waiting for gamepad...")
             
-            if joystick_count == 0:
-                logger.error("No gamepad detected!")
-                logger.info("Connect your PS5 controller via Bluetooth")
-                logger.info("Check: ls /dev/input/js*")
+            # Wait up to 30 seconds for gamepad
+            gamepad_found = False
+            for i in range(30):
+                # Reinitialize pygame each time to detect newly connected devices
+                pygame.quit()
+                pygame.init()
+                pygame.joystick.init()
                 
-                # Wait a bit for controller to connect
-                logger.info("Waiting 30 seconds for gamepad...")
-                for i in range(30):
-                    pygame.joystick.quit()
-                    pygame.joystick.init()
-                    if pygame.joystick.get_count() > 0:
-                        logger.info(f"✓ Gamepad detected after {i+1} seconds!")
-                        joystick_count = pygame.joystick.get_count()
-                        break
-                    time.sleep(1)
-                else:
-                    logger.error("No gamepad found after 30 seconds")
-                    pygame.quit()
-                    return
+                joystick_count = pygame.joystick.get_count()
+                
+                if joystick_count > 0:
+                    logger.info(f"✓ Gamepad detected after {i+1} seconds!")
+                    gamepad_found = True
+                    break
+                
+                if i == 0:
+                    logger.info("No gamepad detected yet, waiting...")
+                
+                time.sleep(1)
+            
+            if not gamepad_found:
+                logger.error("No gamepad found after 30 seconds")
+                logger.info("Make sure PS5 controller is connected")
+                logger.info("Check: ls /dev/input/js*")
+                logger.info("Check: bluetoothctl -> devices")
+                pygame.quit()
+                return
             
             logger.info(f"✓ Found {joystick_count} gamepad(s)")
             pygame.quit()  # Clean up before GamepadTeleop initializes its own
@@ -122,12 +128,18 @@ class RobotController:
             logger.error("'pygame' library not installed")
             logger.info("Install with: pip3 install pygame --break-system-packages")
             return
+        except Exception as e:
+            logger.error(f"Error detecting gamepad: {e}")
+            return
         
         from teleop.gamepad_teleop import GamepadTeleop
         
         logger.info("Starting gamepad control...")
-        with GamepadTeleop(config=self.config, simulate=False) as teleop:
-            teleop.run()
+        try:
+            with GamepadTeleop(config=self.config, simulate=False) as teleop:
+                teleop.run()
+        except Exception as e:
+            logger.error(f"Gamepad teleop error: {e}", exc_info=True)
     
     def mode_autonomous(self):
         """Run autonomous operation mode."""
