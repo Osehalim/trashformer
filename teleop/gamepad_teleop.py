@@ -52,7 +52,7 @@ class GamepadTeleop:
         # Speed settings
         self.current_speed = 0.5      # Start at 0.5 m/s
         self.min_speed = 0.1          # Minimum speed
-        self.max_speed = 1.0          # Maximum speed
+        self.max_speed = 2.0          # Maximum speed
         self.speed_increment = 0.1    # Speed change per button press
         
         self.max_angular_speed = 1.0   # rad/s
@@ -74,8 +74,6 @@ class GamepadTeleop:
         self.square_button = 3
         self.l1_button = 4
         self.r1_button = 5
-        self.l2_button = 6           # L2 trigger (for D-pad mode)
-        self.r2_button = 7           # R2 trigger
         self.start_button = 9        # if this doesn't work, try 10
 
         pygame.init()
@@ -223,16 +221,11 @@ class GamepadTeleop:
         print()
         print(f"Connected controller: {self.joystick.get_name()}")
         print()
-        print("Stick controls:")
-        print("  Left stick: Drive and turn")
-        print("  Right stick X: Rotate in place")
-        print()
-        print("D-PAD controls (for debugging):")
+        print("D-PAD controls:")
         print("  D-pad UP: Forward")
         print("  D-pad DOWN: Backward")
         print("  D-pad LEFT: Turn left")
         print("  D-pad RIGHT: Turn right")
-        print("  (Hold L2 to use D-pad mode)")
         print()
         print("Speed control:")
         print("  R1: Increase speed (+0.1 m/s)")
@@ -251,39 +244,9 @@ class GamepadTeleop:
         print("=" * 60)
         print()
 
-    def update_motors_from_sticks(self) -> None:
-        # Confirmed mapping for your controller
-        left_x = self.get_axis_safe(0)      # Left stick left/right
-        left_y = -self.get_axis_safe(1)     # Left stick up/down (inverted)
-        right_x = self.get_axis_safe(3)     # Right stick left/right
-
-        # Apply deadzones
-        forward = self.apply_deadzone(left_y)    # Forward/backward
-        turn = self.apply_deadzone(left_x)       # Turn left/right
-        rotate = self.apply_deadzone(right_x)    # Rotate in place
-
-        # Right stick rotation gets priority
-        if abs(rotate) > 0.05:
-            # Pure rotation - both motors opposite directions
-            left_motor = -rotate * self.current_speed
-            right_motor = rotate * self.current_speed
-        else:
-            # Normal driving - combine forward and turn
-            # Forward: both motors same speed
-            # Turn: differential speed between left and right
-            left_motor = (forward - turn) * self.current_speed
-            right_motor = (forward + turn) * self.current_speed
-        
-        # Clamp to -1.0 to 1.0
-        left_motor = max(-1.0, min(1.0, left_motor))
-        right_motor = max(-1.0, min(1.0, right_motor))
-        
-        # Send to motors
-        self.drive.set_motor_speeds(left_motor, right_motor)
-
     def update_motors_from_dpad(self) -> None:
-        """Control with D-pad buttons for debugging."""
-        # PS5 D-pad typically uses a hat (directional pad)
+        """Control with D-pad buttons - PRIMARY CONTROL METHOD."""
+        # PS5 D-pad uses a hat (directional pad)
         # Hat index 0, returns (x, y) where:
         # x: -1=left, 0=center, 1=right
         # y: -1=down, 0=center, 1=up
@@ -295,22 +258,18 @@ class GamepadTeleop:
             # Convert D-pad to motor commands
             speed = self.current_speed
             
-            if hat_y == 1:  # D-pad UP
-                print("D-pad: UP (forward)")
+            if hat_y == 1:  # D-pad UP - Forward
                 self.drive.set_motor_speeds(speed, speed)
-            elif hat_y == -1:  # D-pad DOWN
-                print("D-pad: DOWN (backward)")
+            elif hat_y == -1:  # D-pad DOWN - Backward
                 self.drive.set_motor_speeds(-speed, -speed)
-            elif hat_x == -1:  # D-pad LEFT
-                print("D-pad: LEFT (turn left)")
+            elif hat_x == -1:  # D-pad LEFT - Turn left
                 self.drive.set_motor_speeds(-speed, speed)
-            elif hat_x == 1:  # D-pad RIGHT
-                print("D-pad: RIGHT (turn right)")
+            elif hat_x == 1:  # D-pad RIGHT - Turn right
                 self.drive.set_motor_speeds(speed, -speed)
-            else:  # D-pad centered
+            else:  # D-pad centered - Stop
                 self.drive.set_motor_speeds(0, 0)
         else:
-            # Fallback: stop if no D-pad
+            # No D-pad available - stop
             self.drive.set_motor_speeds(0, 0)
 
     def run(self) -> None:
@@ -329,7 +288,6 @@ class GamepadTeleop:
                 start = self.get_button_safe(self.start_button)
                 r1 = self.get_button_safe(self.r1_button)
                 l1 = self.get_button_safe(self.l1_button)
-                l2 = self.get_button_safe(self.l2_button)  # D-pad mode trigger
 
                 # Speed control (single press detection)
                 if r1 and not self.r1_was_pressed:
@@ -363,12 +321,9 @@ class GamepadTeleop:
                         self.drive.set_motor_speeds(self.button_turn_speed, -self.button_turn_speed)
                     elif circle:
                         self.drive.set_motor_speeds(-self.button_turn_speed, self.button_turn_speed)
-                elif l2:
-                    # D-pad mode (hold L2 to use D-pad instead of sticks)
-                    self.update_motors_from_dpad()
                 else:
-                    # Normal stick control - ALWAYS runs when no buttons pressed
-                    self.update_motors_from_sticks()
+                    # D-pad control - PRIMARY CONTROL METHOD
+                    self.update_motors_from_dpad()
 
                 time.sleep(self.loop_delay)
 
