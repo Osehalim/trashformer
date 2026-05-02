@@ -57,7 +57,7 @@ class GamepadTeleop:
         
         self.max_angular_speed = 1.0   # rad/s
         self.button_turn_speed = 0.50
-        self.deadzone = 0.25
+        self.deadzone = 0.05
         self.loop_delay = 0.05
 
         self.running = True
@@ -141,7 +141,7 @@ class GamepadTeleop:
         1. Gripper open (ready to pickup)
         2. Gripper close (grab object)
         3. Shoulder servo up
-        4. Elbow servo left (rotate right)
+        4. Elbow servo right
         5. Gripper open (drop object)
         6. Elbow back to 0
         7. Shoulder down
@@ -310,18 +310,19 @@ class GamepadTeleop:
                     time.sleep(0.1)
                     continue
 
-                # Backup/debug button controls
-                if triangle:
-                    self.drive.set_motor_speeds(self.button_turn_speed, self.button_turn_speed)
+                # Check if any debug buttons are pressed
+                any_button_pressed = triangle or square or circle
 
-                elif square:
-                    self.drive.set_motor_speeds(self.button_turn_speed, -self.button_turn_speed)
-
-                elif circle:
-                    self.drive.set_motor_speeds(-self.button_turn_speed, self.button_turn_speed)
-
+                # Backup/debug button controls (only if pressed)
+                if any_button_pressed:
+                    if triangle:
+                        self.drive.set_motor_speeds(self.button_turn_speed, self.button_turn_speed)
+                    elif square:
+                        self.drive.set_motor_speeds(self.button_turn_speed, -self.button_turn_speed)
+                    elif circle:
+                        self.drive.set_motor_speeds(-self.button_turn_speed, self.button_turn_speed)
                 else:
-                    # Normal stick control
+                    # Normal stick control - ALWAYS runs when no buttons pressed
                     self.update_motors_from_sticks()
 
                 time.sleep(self.loop_delay)
