@@ -52,7 +52,7 @@ class GamepadTeleop:
         # Speed settings
         self.current_speed = 0.5      # Start at 0.5 m/s
         self.min_speed = 0.1          # Minimum speed
-        self.max_speed = 1.0          # Maximum speed
+        self.max_speed = 1.5          # Maximum speed
         self.speed_increment = 0.1    # Speed change per button press
         
         self.max_angular_speed = 1.0   # rad/s
