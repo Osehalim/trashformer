@@ -87,8 +87,8 @@ drive:
   motor_controller:
     mode: "usb"
     use_usb: true
-    left_port: "/dev/ttyACM3"
-    right_port: "/dev/ttyACM2"
+    left_port: "/dev/ttyACM5"
+    right_port: "/dev/ttyACM4"
     baudrate: 38400
     left_address: 0x80
     right_address: 0x80
