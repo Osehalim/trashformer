@@ -48,7 +48,7 @@ class DriveController:
 
             # USB defaults
             left_port = config.get("drive.motor_controller.left_port", "/dev/ttyACM0")
-            right_port = config.get("drive.motor_controller.right_port", "/dev/ttyACM1")
+            right_port = config.get("drive.motor_controller.right_port", "/dev/ttyACM2")
 
             # UART fallback/defaults
             port = config.get("drive.motor_controller.port", "/dev/ttyAMA0")

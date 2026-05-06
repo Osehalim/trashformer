@@ -36,7 +36,7 @@ class DualRoboClawController:
     Controller for dual RoboClaw setup (left and right tracks).
 
     Supports two communication modes:
-    - usb:   one RoboClaw per serial device (/dev/ttyACM0, /dev/ttyACM1)
+    - usb:   one RoboClaw per serial device (/dev/ttyACM0, /dev/ttyACM2)
     - uart:  both RoboClaws on one shared packet-serial bus
     """
 
@@ -49,7 +49,7 @@ class DualRoboClawController:
         simulate: bool = False,
         mode: str = "usb",
         left_port: str = "/dev/ttyACM0",
-        right_port: str = "/dev/ttyACM1",
+        right_port: str = "/dev/ttyACM2",
     ):
         self.port = port
         self.baudrate = baudrate
