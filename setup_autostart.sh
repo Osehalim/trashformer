@@ -12,9 +12,9 @@ After=network.target bluetooth.service
 [Service]
 Type=simple
 User=trashformer
-WorkingDirectory=/home/pi/trashformer
+WorkingDirectory=/home/trashformer/trashformer
 Environment="PYTHONUNBUFFERED=1"
-ExecStart=/usr/bin/python3 /home/pi/trashformer/main.py --mode gamepad
+ExecStart=/usr/bin/python3 /home/trashformer/trashformer/main.py --mode gamepad
 Restart=on-failure
 RestartSec=5
 
