@@ -20,11 +20,11 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 try:
-    from roboclaw import Roboclaw
+    from drive.roboclaw_3 import Roboclaw
     ROBOCLAW_AVAILABLE = True
 except ImportError:
     try:
-        from roboclaw import Roboclaw
+        from drive.roboclaw import Roboclaw
         ROBOCLAW_AVAILABLE = True
     except ImportError:
         ROBOCLAW_AVAILABLE = False
