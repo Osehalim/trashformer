@@ -13,22 +13,33 @@ Communication:
 from __future__ import annotations
 
 import os
+import glob
 import time
-from typing import Optional
+from typing import Optional, List
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 try:
-    from drive.roboclaw_3 import Roboclaw
+    from roboclaw import Roboclaw
     ROBOCLAW_AVAILABLE = True
 except ImportError:
     try:
-        from drive.roboclaw import Roboclaw
+        from roboclaw import Roboclaw
         ROBOCLAW_AVAILABLE = True
     except ImportError:
         ROBOCLAW_AVAILABLE = False
         logger.warning("roboclaw library not available - see setup instructions")
+
+
+def find_roboclaw_ports() -> List[str]:
+    """
+    Auto-detect available RoboClaw USB ports.
+    Returns list of /dev/ttyACM* ports that exist.
+    """
+    ports = glob.glob('/dev/ttyACM*')
+    ports.sort()  # Sort so order is consistent
+    return ports
 
 
 class DualRoboClawController:
@@ -36,7 +47,7 @@ class DualRoboClawController:
     Controller for dual RoboClaw setup (left and right tracks).
 
     Supports two communication modes:
-    - usb:   one RoboClaw per serial device (/dev/ttyACM4, /dev/ttyACM2)
+    - usb:   one RoboClaw per serial device (auto-detected or specified)
     - uart:  both RoboClaws on one shared packet-serial bus
     """
 
@@ -48,21 +59,37 @@ class DualRoboClawController:
         right_address: int = 0x81,
         simulate: bool = False,
         mode: str = "usb",
-        left_port: str = "/dev/ttyACM3",
-        right_port: str = "/dev/ttyACM2",
+        left_port: str = "auto",
+        right_port: str = "auto",
     ):
         self.port = port
         self.baudrate = baudrate
         self.left_address = left_address
         self.right_address = right_address
         self.mode = str(mode).lower().strip()
-        self.left_port = left_port
-        self.right_port = right_port
         self.simulate = simulate or (not ROBOCLAW_AVAILABLE)
 
         self.rc: Optional[Roboclaw] = None
         self.rc_left: Optional[Roboclaw] = None
         self.rc_right: Optional[Roboclaw] = None
+
+        # Auto-detect ports if set to "auto"
+        if self.mode == "usb" and (left_port == "auto" or right_port == "auto"):
+            detected_ports = find_roboclaw_ports()
+            
+            if len(detected_ports) < 2:
+                raise RuntimeError(
+                    f"Need 2 RoboClaw ports but found {len(detected_ports)}: {detected_ports}\n"
+                    "Check USB connections and ensure both RoboClaws are powered on."
+                )
+            
+            logger.info(f"Found {len(detected_ports)} RoboClaw ports: {detected_ports}")
+            self.left_port = detected_ports[0]
+            self.right_port = detected_ports[1]
+            logger.info(f"Auto-assigned: left={self.left_port}, right={self.right_port}")
+        else:
+            self.left_port = left_port
+            self.right_port = right_port
 
         if self.simulate:
             logger.warning("RoboClaw controller running in SIMULATION mode")
