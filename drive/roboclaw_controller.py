@@ -48,8 +48,8 @@ class DualRoboClawController:
         right_address: int = 0x81,
         simulate: bool = False,
         mode: str = "usb",
-        left_port: str = "/dev/ttyACM0",
-        right_port: str = "/dev/ttyACM1",
+        left_port: str = "/dev/ttyACM3",
+        right_port: str = "/dev/ttyACM2",
     ):
         self.port = port
         self.baudrate = baudrate
