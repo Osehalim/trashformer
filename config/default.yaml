@@ -95,7 +95,7 @@ drive:
   wheel_diameter: 0.15
   track_width: 0.30
   
-  max_linear_speed: 1.0
+  max_linear_speed: 1.5
   max_angular_speed: 2.0
   
   pid:

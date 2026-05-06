@@ -246,31 +246,30 @@ class GamepadTeleop:
 
     def update_motors_from_dpad(self) -> None:
         """Control with D-pad buttons - PRIMARY CONTROL METHOD."""
-        # PS5 D-pad uses a hat (directional pad)
-        # Hat index 0, returns (x, y) where:
-        # x: -1=left, 0=center, 1=right
-        # y: -1=down, 0=center, 1=up
-        
         if self.joystick.get_numhats() > 0:
             hat = self.joystick.get_hat(0)
             hat_x, hat_y = hat
             
-            # Convert D-pad to motor commands
+            # DEBUG - Print hat values
+            if hat_x != 0 or hat_y != 0:
+                print(f"D-pad: x={hat_x}, y={hat_y}")
+            
             speed = self.current_speed
             
-            if hat_y == 1:  # D-pad UP - Forward
+            if hat_y == 1:  # D-pad UP
+                print("D-pad UP - Forward")
                 self.drive.set_motor_speeds(speed, speed)
-            elif hat_y == -1:  # D-pad DOWN - Backward
+            elif hat_y == -1:  # D-pad DOWN
+                print("D-pad DOWN - Backward")
                 self.drive.set_motor_speeds(-speed, -speed)
-            elif hat_x == -1:  # D-pad LEFT - Turn left (SWAPPED)
+            elif hat_x == -1:  # D-pad LEFT
+                print("D-pad LEFT - Turn left")
                 self.drive.set_motor_speeds(speed, -speed)
-            elif hat_x == 1:  # D-pad RIGHT - Turn right (SWAPPED)
+            elif hat_x == 1:  # D-pad RIGHT
+                print("D-pad RIGHT - Turn right")
                 self.drive.set_motor_speeds(-speed, speed)
-            else:  # D-pad centered - Stop
+            else:
                 self.drive.set_motor_speeds(0, 0)
-        else:
-            # No D-pad available - stop
-            self.drive.set_motor_speeds(0, 0)
 
     def run(self) -> None:
         self.print_instructions()
