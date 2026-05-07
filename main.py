@@ -102,8 +102,8 @@ class RobotController:
                 logger.info("Check: ls /dev/input/js*")
                 
                 # Wait a bit for controller to connect
-                logger.info("Waiting 30 seconds for gamepad...")
-                for i in range(30):
+                logger.info("Waiting 180 seconds for gamepad...")
+                for i in range(180):
                     pygame.joystick.quit()
                     pygame.joystick.init()
                     if pygame.joystick.get_count() > 0:
