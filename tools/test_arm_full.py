@@ -81,7 +81,7 @@ def main() -> int:
         # 4. Turn elbow 90 degrees right
         logger.info("Step 4: Turning elbow 90° to the right")
         logger.info("  - Elbow: 0° → 90°")
-        arm.elbow_right(90, speed=SPEED)
+        arm.elbow_right(-90, speed=SPEED)
         wait(DELAY)
 
         # 5. Open gripper

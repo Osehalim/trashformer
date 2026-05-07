@@ -321,7 +321,7 @@ class ArmController:
         return self.move_to_angles({"shoulder": angle}, speed=speed, blocking=True)
 
     def shoulder_horizontal(self, speed: Optional[float] = None) -> bool:
-        return self.move_to_angles({"shoulder": 90}, speed=speed, blocking=True)
+        return self.move_to_angles({"shoulder": -90}, speed=speed, blocking=True)
 
     def elbow_center(self, speed: Optional[float] = None) -> bool:
         # 0° = forward/center
