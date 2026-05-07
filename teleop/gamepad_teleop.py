@@ -258,9 +258,9 @@ class GamepadTeleop:
             # Convert D-pad to motor commands
             speed = self.current_speed
             
-            if hat_x == 1:  # D-pad UP - Forward
+            if hat_x == -1:  # D-pad UP - Forward
                 self.drive.set_motor_speeds(speed, speed)
-            elif hat_x == -1:  # D-pad DOWN - Backward
+            elif hat_x == 1:  # D-pad DOWN - Backward
                 self.drive.set_motor_speeds(-speed, -speed)
             elif hat_y == -1:  # D-pad LEFT - Turn left (SWAPPED)
                 self.drive.set_motor_speeds(-speed, speed)
