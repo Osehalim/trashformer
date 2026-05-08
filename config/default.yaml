@@ -69,7 +69,6 @@ arm:
     max_angle: 90      # Degrees (closed)
     home_angle: 0      # Starting position (open)
   # Movement settings
-  
   movement:
     default_speed: 50     # degrees/second
     max_speed: 100        # degrees/second
