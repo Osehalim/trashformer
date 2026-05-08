@@ -27,43 +27,49 @@ hardware:
 # Arm Configuration (3-Servo Arm via PCA9685 - ALL POSITION SERVOS)
 # ============================================================================
 arm:
-  # PWM frequency
+  # PCA9685 settings
+  i2c_address: 0x40
   pwm_frequency: 50  # 50Hz for servos
   
-  # PCA9685 channel assignments
-  servo_channels:
-    shoulder: 0   # Savox SC-1268SG (high-torque position servo)
-    elbow: 1      # Standard position servo (INVERTED)
-    gripper: 2    # ServoCity gripper kit (position servo)
+  # Servo channel assignments
+  shoulder_channel: 0
+  elbow_channel: 1
+  gripper_channel: 2
   
-  # Servo angle limits (degrees)
-  # Shoulder: 0° down, 90° horizontal, 180° up
-  # Elbow:    0° center/straight, 90° max right (INVERTED SERVO)
-  # Gripper:  0° open, 90° closed
-  angle_limits:
-    shoulder:
-      min: 0
-      max: 180
-      home: 0
-    elbow:
-      min: 0
-      max: 90
-      home: 0
-    gripper:
-      min: 0
-      max: 90
-      home: 0
+  # Shoulder servo configuration
+  # IMPORTANT: Servo is mounted HORIZONTALLY
+  # 500μs = Arm up 90° (vertical)
+  # 1500μs = Arm horizontal (REST/home position)
+  # We only use 500-1500μs range (never go to 2500μs)
+  shoulder:
+    min_pulse: 500     # Microseconds for 90° UP
+    max_pulse: 1500    # Microseconds for 0° (horizontal REST)
+    min_angle: 0       # Logical 0° = horizontal (rest)
+    max_angle: 90      # Logical 90° = vertical (up)
+    home_angle: 0      # Starting position (horizontal)
   
-  # PWM pulse width limits (microseconds)
-  # IMPORTANT: Elbow servo is INVERTED!
-  # - Center (0°) = 1500μs
-  # - Right (90°) = Lower pulse (e.g., 600μs)
-  # So we SWAP min/max to invert the servo
-  pwm_limits:
-    min_pulse: 600    # Used for shoulder/gripper
-    max_pulse: 2400   # Used for shoulder/gripper
+  # Elbow servo configuration  
+  # Model: Standard position servo with 100° operating stroke
+  # Specs: 1000μs = 0°, 2000μs = 100° (1500μs = neutral/50°)
+  # Full range: 800-2200μs for ~130°
+  elbow:
+    min_pulse: 1000    # Microseconds for 0° (center)
+    max_pulse: 2000    # Microseconds for 100° (left)
+    min_angle: 0       # Degrees (center/forward)
+    max_angle: 90      # Degrees (max left rotation)
+    home_angle: 0      # Starting position
   
+  # Gripper servo configuration
+  # Model: Standard position servo
+  # Specs: 500μs = 0°, 2500μs = 180°
+  gripper:
+    min_pulse: 500     # Microseconds for 0° (open)
+    max_pulse: 2500    # Microseconds for 180° (closed)
+    min_angle: 0       # Degrees (open)
+    max_angle: 90      # Degrees (closed)
+    home_angle: 0      # Starting position (open)
   # Movement settings
+  
   movement:
     default_speed: 50     # degrees/second
     max_speed: 100        # degrees/second
