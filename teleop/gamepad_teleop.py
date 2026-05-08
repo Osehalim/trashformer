@@ -15,7 +15,7 @@ Controls:
   Right stick X: Rotate in place
   R1: Increase speed (+0.1 m/s)
   L1: Decrease speed (-0.1 m/s)
-  Cross (X): Toggle gripper open/close
+  Cross (X): Run pickup sequence
   Triangle: Forward (backup/debug)
   Square: Turn left (backup/debug)
   Circle: Turn right (backup/debug)
@@ -66,9 +66,6 @@ class GamepadTeleop:
         self.r1_was_pressed = False
         self.l1_was_pressed = False
         self.cross_was_pressed = False
-
-        # Gripper state toggle
-        self.gripper_is_open = True
 
         # Button mapping for PS5 controller
         self.cross_button = 0        # X button
@@ -137,30 +134,6 @@ class GamepadTeleop:
         if old_speed != self.current_speed:
             logger.info(f"Speed decreased: {self.current_speed:.1f} m/s")
             print(f">>> Speed: {self.current_speed:.1f} m/s")
-
-    def toggle_gripper(self):
-        """Toggle gripper open/closed."""
-        self.initialize_arm()
-
-        if self.arm is None:
-            logger.error("Arm not available - cannot control gripper")
-            print("ERROR: Arm system not initialized!")
-            return
-
-        try:
-            if self.gripper_is_open:
-                logger.info("Gripper: closing")
-                print(">>> Gripper: CLOSING")
-                self.arm.gripper_close()
-                self.gripper_is_open = False
-            else:
-                logger.info("Gripper: opening")
-                print(">>> Gripper: OPENING")
-                self.arm.gripper_open()
-                self.gripper_is_open = True
-        except Exception as e:
-            logger.error(f"Gripper toggle failed: {e}")
-            print(f"ERROR: Gripper failed - {e}")
 
     def run_pickup_sequence(self):
         """
@@ -236,9 +209,6 @@ class GamepadTeleop:
             print("PICKUP SEQUENCE COMPLETE!")
             print("="*60 + "\n")
             logger.info("✓ Pickup sequence complete")
-
-            # Sync gripper state: sequence ends with gripper open
-            self.gripper_is_open = True
             
         except Exception as e:
             logger.error(f"Pickup sequence failed: {e}")
@@ -263,7 +233,7 @@ class GamepadTeleop:
         print(f"  Current speed: {self.current_speed:.1f} m/s")
         print()
         print("Action buttons:")
-        print("  Cross (X): Toggle gripper open/close")
+        print("  Cross (X): Run pickup sequence")
         print()
         print("Button controls (backup/debug):")
         print("  Triangle: Forward")
@@ -328,9 +298,9 @@ class GamepadTeleop:
                     self.decrease_speed()
                 self.l1_was_pressed = l1
 
-                # Gripper toggle (single press detection)
+                # Pickup sequence (single press detection)
                 if cross and not self.cross_was_pressed:
-                    self.toggle_gripper()
+                    self.run_pickup_sequence()
                 self.cross_was_pressed = cross
 
                 # Stop button always has priority
