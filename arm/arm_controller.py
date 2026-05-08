@@ -2,16 +2,18 @@
 """
 arm/arm_controller.py — Arm controller for a 3-servo arm via PCA9685 (Pi -> I2C -> PCA9685)
 
-Semantics (as you described):
-- Shoulder: 0° down, 90° horizontal, 180° up
-- Elbow: 0° forward/center, rotates RIGHT up to MAX (you set MAX=90 in config)
-- Gripper: 0° open, 90° closed
+Semantics:
+- Shoulder: 0° = arm straight down (rest/home), 90° = arm horizontal, 180° = arm straight up
+            Servo: 500µs=0°, 1500µs=90°, 2500µs=180°
+            Arm hangs vertically at rest; home=90° (1500µs = arm pointing down)
+- Elbow:    0° = center/forward (1000µs), 100° = full operating stroke (2000µs)
+- Gripper:  0° = open (500µs), 90° = closed
 
-This version:
-- Loads config/default.yaml via ConfigLoader
-- Loads poses from arm/poses.yaml (relative path)
-- Loads servo calibration from data/calibration/servo_limits.json (if present)
-  and applies per-servo min/max pulse widths (and optional invert/offset).
+Config keys read from default.yaml:
+  arm.servo_channels.{shoulder,elbow,gripper}   -> channel numbers
+  arm.angle_limits.{shoulder,elbow,gripper}.{min,max,home}  -> angle range & home
+  arm.{shoulder,elbow,gripper}.{min_pulse,max_pulse}        -> pulse widths
+  arm.pwm_limits.{min_pulse,max_pulse}                      -> global fallback pulses
 """
 
 from __future__ import annotations
@@ -82,35 +84,54 @@ class ArmController:
         # Movement settings
         self.default_speed = float(self.config.get("arm.movement.default_speed", 50))
 
-        # Global PWM limits (fallbacks)
+        # Global PWM limits (fallbacks if per-servo section missing)
         global_min_pulse = int(self.config.get("arm.pwm_limits.min_pulse", 500))
         global_max_pulse = int(self.config.get("arm.pwm_limits.max_pulse", 2500))
 
-        # Channels + angle limits
+        # ----------------------------------------------------------------
+        # Read servo channels from arm.servo_channels.*
+        # Read angle limits  from arm.angle_limits.*
+        # Read pulse widths  from arm.{shoulder,elbow,gripper}.{min,max}_pulse
+        # ----------------------------------------------------------------
         arm_section = self.config.get_section("arm")
         channels = arm_section.get("servo_channels", {}) or {}
-        limits = arm_section.get("angle_limits", {}) or {}
+        limits   = arm_section.get("angle_limits", {}) or {}
 
-        # Load calibration (if available)
+        def _get_pulses(servo_name: str) -> Tuple[int, int]:
+            """
+            Read min/max pulse from arm.<servo_name>.min_pulse / max_pulse.
+            Falls back to global limits if the section is absent.
+            """
+            section = arm_section.get(servo_name, {}) or {}
+            min_p = int(section.get("min_pulse", global_min_pulse))
+            max_p = int(section.get("max_pulse", global_max_pulse))
+            return min_p, max_p
+
+        # Load calibration (if available) — overrides YAML pulse values
         self.calib = _load_servo_calibration()
-
-        # Create servos
-        self.servos: Dict[str, Servo] = {}
 
         def _servo_pulses(name: str) -> Tuple[int, int, float, bool]:
             """
-            Returns (min_pulse, max_pulse, offset_deg, invert) for a servo name.
-            Falls back to global pulses if not calibrated.
+            Returns (min_pulse, max_pulse, offset_deg, invert).
+            Calibration file takes priority over YAML if present.
             """
+            yaml_min, yaml_max = _get_pulses(name)
             c = self.calib.get(name, {})
-            min_p = int(c.get("min_pulse", global_min_pulse))
-            max_p = int(c.get("max_pulse", global_max_pulse))
-            # Optional extras (your calibrator stored these)
+            min_p  = int(c.get("min_pulse",   yaml_min))
+            max_p  = int(c.get("max_pulse",   yaml_max))
             offset = float(c.get("offset_deg", 0.0))
-            invert = bool(c.get("invert", False))
+            invert = bool(c.get("invert",      False))
             return min_p, max_p, offset, invert
 
+        self.servos: Dict[str, Servo] = {}
+
+        # ----------------------------------------------------------------
         # Shoulder
+        # Logical 0°  = arm straight down (rest)  = 1500µs at neutral
+        # Logical 90° = arm horizontal             = 500µs  or 2500µs
+        #               depending on mounting side
+        # home_angle = 0 so home() = arm pointing down
+        # ----------------------------------------------------------------
         shoulder_cfg = limits.get("shoulder", {}) or {}
         sh_min_p, sh_max_p, sh_off, sh_inv = _servo_pulses("shoulder")
         self._shoulder_offset = sh_off
@@ -128,7 +149,11 @@ class ArmController:
             neutral_angle=float(shoulder_cfg.get("home", 0)),
         )
 
-        # Elbow (your config sets max to 90 for “fully right”)
+        # ----------------------------------------------------------------
+        # Elbow
+        # 0°   = center/forward = 1000µs
+        # 100° = full operating stroke = 2000µs  (matches spec sheet)
+        # ----------------------------------------------------------------
         elbow_cfg = limits.get("elbow", {}) or {}
         el_min_p, el_max_p, el_off, el_inv = _servo_pulses("elbow")
         self._elbow_offset = el_off
@@ -139,14 +164,18 @@ class ArmController:
             channel=int(channels.get("elbow", 1)),
             name="elbow",
             min_angle=float(elbow_cfg.get("min", 0)),
-            max_angle=float(elbow_cfg.get("max", 90)),
+            max_angle=float(elbow_cfg.get("max", 100)),
             min_pulse=el_min_p,
             max_pulse=el_max_p,
             home_angle=float(elbow_cfg.get("home", 0)),
             neutral_angle=float(elbow_cfg.get("home", 0)),
         )
 
+        # ----------------------------------------------------------------
         # Gripper
+        # 0°  = open  = 500µs
+        # 90° = closed
+        # ----------------------------------------------------------------
         gripper_cfg = limits.get("gripper", {}) or {}
         gr_min_p, gr_max_p, gr_off, gr_inv = _servo_pulses("gripper")
         self._gripper_offset = gr_off
@@ -175,6 +204,12 @@ class ArmController:
             f"ArmController ready: servos={list(self.servos.keys())}, poses={len(self.poses)}, "
             f"calibration={'FOUND' if self.calib else 'NOT FOUND'}"
         )
+        for sname, srv in self.servos.items():
+            logger.info(
+                f"  {sname}: ch={srv.channel}, "
+                f"pulse=[{srv.min_pulse},{srv.max_pulse}]µs, "
+                f"angle=[{srv.min_angle}°,{srv.max_angle}°], home={srv.home_angle}°"
+            )
 
     def _load_poses(self) -> None:
         """Load poses from arm/poses.yaml relative to this file."""
@@ -305,6 +340,7 @@ class ArmController:
     def home(self, speed: Optional[float] = None, blocking: bool = True) -> bool:
         if "home" in self.poses:
             return self.go_to_pose("home", speed=speed, blocking=blocking)
+        # shoulder=0 = arm straight down, elbow=0 = center, gripper=0 = open
         return self.move_to_angles({"shoulder": 0, "elbow": 0, "gripper": 0}, speed=speed, blocking=blocking)
 
     def neutral(self, speed: Optional[float] = None, blocking: bool = True) -> bool:
@@ -315,24 +351,36 @@ class ArmController:
     # ---------------- Convenience controls ----------------
 
     def shoulder_up(self, angle: float = 180, speed: Optional[float] = None) -> bool:
+        """Move shoulder toward maximum angle (arm swings up)."""
         return self.move_to_angles({"shoulder": angle}, speed=speed, blocking=True)
 
     def shoulder_down(self, angle: float = 0, speed: Optional[float] = None) -> bool:
+        """Move shoulder toward 0° (arm pointing straight down)."""
         return self.move_to_angles({"shoulder": angle}, speed=speed, blocking=True)
 
     def shoulder_horizontal(self, speed: Optional[float] = None) -> bool:
+        """Move shoulder to 90° (arm horizontal)."""
         return self.move_to_angles({"shoulder": 90}, speed=speed, blocking=True)
 
     def elbow_center(self, speed: Optional[float] = None) -> bool:
-        # 0° = forward/center
+        """Move elbow to 0° (center/forward)."""
         return self.move_to_angles({"elbow": 0}, speed=speed, blocking=True)
 
     def elbow_right(self, angle: float = 45, speed: Optional[float] = None) -> bool:
-        # RIGHT only; your max is enforced by servo max_angle (from config)
+        """
+        Move elbow to a positive angle (0°=center, 100°=full operating stroke).
+        Angle must be >= 0. Use elbow_center() to return to 0°.
+        """
+        if angle < 0:
+            logger.warning(
+                f"elbow_right() called with negative angle ({angle}°); "
+                f"clamping to 0. Use elbow_center() to go to 0°."
+            )
+            angle = 0.0
         return self.move_to_angles({"elbow": angle}, speed=speed, blocking=True)
 
     def elbow_full_right(self, speed: Optional[float] = None) -> bool:
-        # Full-right = elbow servo's configured max (likely 90)
+        """Move elbow to its maximum configured angle."""
         max_right = float(self.servos["elbow"].max_angle)
         return self.move_to_angles({"elbow": max_right}, speed=speed, blocking=True)
 
@@ -340,33 +388,31 @@ class ArmController:
         return self.move_to_angles({"gripper": 0}, speed=speed, blocking=True)
 
     def close_gripper(self, speed: Optional[float] = None) -> bool:
-        # Note: if your gripper “close” is less than 90 mechanically,
-        # put that in poses or change max_angle/home in config or calibration.
         return self.move_to_angles({"gripper": 90}, speed=speed, blocking=True)
 
     def set_gripper(self, angle: float, speed: Optional[float] = None) -> bool:
         return self.move_to_angles({"gripper": angle}, speed=speed, blocking=True)
 
     # ---------------- Simple interface (aliases) ----------------
-    
+
     def gripper_open(self, speed: Optional[float] = None) -> bool:
         """Alias for open_gripper()"""
         return self.open_gripper(speed=speed)
-    
+
     def gripper_close(self, speed: Optional[float] = None) -> bool:
         """Alias for close_gripper()"""
         return self.close_gripper(speed=speed)
-    
+
     def move_shoulder(self, angle: float, speed: Optional[float] = None) -> bool:
-        """Move shoulder to specific angle (0=down, 90=horizontal, 180=up)"""
+        """Move shoulder to specific angle (0=arm down, 90=horizontal, 180=arm up)."""
         return self.move_to_angles({"shoulder": angle}, speed=speed, blocking=True)
-    
+
     def move_elbow(self, angle: float, speed: Optional[float] = None) -> bool:
-        """Move elbow to specific angle (0=center/forward, max=full right)"""
+        """Move elbow to specific angle (0=center/forward, 100=full operating stroke)."""
         return self.move_to_angles({"elbow": angle}, speed=speed, blocking=True)
-    
+
     def move_gripper(self, angle: float, speed: Optional[float] = None) -> bool:
-        """Move gripper to specific angle (0=open, 90=closed)"""
+        """Move gripper to specific angle (0=open, 90=closed)."""
         return self.set_gripper(angle, speed=speed)
 
     # ---------------- Utilities ----------------

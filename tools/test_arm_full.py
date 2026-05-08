@@ -6,7 +6,7 @@ Sequence:
 1) Open gripper
 2) Close gripper
 3) Raise shoulder to 90° (arm horizontal)
-4) Turn elbow 90° to the right
+4) Turn elbow to 90° (operating stroke)
 5) Open gripper
 6) Close gripper
 7) Return elbow to 0°
@@ -14,8 +14,17 @@ Sequence:
 
 Safety:
 - Keep the arm clear.
-- Use an external 5V servo power supply (NOT Pi 5V).
+- Use an external 5V/6V servo power supply (NOT Pi 5V).
 - Make sure Pi ground and servo power ground are common.
+
+Shoulder logical angles:
+  0°   = arm pointing straight DOWN  (home/rest, 1500µs)
+  90°  = arm horizontal              (500µs or 2500µs depending on mount side)
+  180° = arm pointing straight UP
+
+Elbow logical angles:
+  0°   = center / forward            (1000µs)
+  100° = full operating stroke       (2000µs)
 """
 
 from __future__ import annotations
@@ -49,60 +58,60 @@ def main() -> int:
 
         logger.info("Servo Channel Mapping:")
         for name, servo in arm.servos.items():
-            logger.info(f"  {name}: Channel {servo.channel}")
+            logger.info(
+                f"  {name}: Channel {servo.channel}  "
+                f"pulse=[{servo.min_pulse},{servo.max_pulse}]µs  "
+                f"angle=[{servo.min_angle}°,{servo.max_angle}°]  home={servo.home_angle}°"
+            )
         logger.info("")
 
         # Start from home
         logger.info("Step 0: Going to HOME position")
-        logger.info("  - Shoulder: 0°")
-        logger.info("  - Elbow: 0°")
-        logger.info("  - Gripper: 0° (open/home depending on config)")
+        logger.info("  - Shoulder: 0° (arm straight down)")
+        logger.info("  - Elbow:    0° (center/forward)")
+        logger.info("  - Gripper:  0° (open)")
         arm.home(speed=SPEED, blocking=True)
         wait(DELAY)
 
         # 1. Open gripper
         logger.info("Step 1: Opening gripper")
-        logger.info("  - Gripper: open")
         arm.open_gripper(speed=SPEED)
         wait(DELAY)
 
         # 2. Close gripper
         logger.info("Step 2: Closing gripper")
-        logger.info("  - Gripper: closed")
         arm.close_gripper(speed=SPEED)
         wait(DELAY)
 
-        # 3. Raise shoulder to 90 degrees
-        logger.info("Step 3: Raising shoulder to 90°")
+        # 3. Raise shoulder to 90° (horizontal)
+        logger.info("Step 3: Raising shoulder to 90° (horizontal)")
         logger.info("  - Shoulder: 0° → 90°")
         arm.shoulder_horizontal(speed=SPEED)
         wait(DELAY)
 
-        # 4. Turn elbow 90 degrees right
-        logger.info("Step 4: Turning elbow 90° to the right")
-        logger.info("  - Elbow: 0° → 90°")
-        arm.elbow_right(-90, speed=SPEED)
+        # 4. Turn elbow 90° (within its 0-100° operating stroke)
+        logger.info("Step 4: Turning elbow to 90°")
+        logger.info("  - Elbow: 0° → 90°  (1000µs → 1900µs)")
+        arm.elbow_right(90, speed=SPEED)   # FIXED: was elbow_right(-90, ...) which clamped to 0°
         wait(DELAY)
 
         # 5. Open gripper
         logger.info("Step 5: Opening gripper")
-        logger.info("  - Gripper: open")
         arm.open_gripper(speed=SPEED)
         wait(DELAY)
 
         # 6. Close gripper
         logger.info("Step 6: Closing gripper")
-        logger.info("  - Gripper: closed")
         arm.close_gripper(speed=SPEED)
         wait(DELAY)
 
-        # 7. Return elbow to 0 degrees
+        # 7. Return elbow to 0°
         logger.info("Step 7: Returning elbow to 0°")
         logger.info("  - Elbow: 90° → 0°")
         arm.elbow_center(speed=SPEED)
         wait(DELAY)
 
-        # 8. Lower shoulder back to 0 degrees
+        # 8. Lower shoulder back to 0°
         logger.info("Step 8: Lowering shoulder back to 0°")
         logger.info("  - Shoulder: 90° → 0°")
         arm.shoulder_down(0, speed=SPEED)

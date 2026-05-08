@@ -30,44 +30,64 @@ arm:
   # PCA9685 settings
   i2c_address: 0x40
   pwm_frequency: 50  # 50Hz for servos
-  
+
   # Servo channel assignments
-  shoulder_channel: 0
-  elbow_channel: 1
-  gripper_channel: 2
-  
-  # Shoulder servo configuration
-  # IMPORTANT: Servo is mounted HORIZONTALLY
-  # 500μs = Arm up 90° (vertical)
-  # 1500μs = Arm horizontal (REST/home position)
-  # We only use 500-1500μs range (never go to 2500μs)
+  # NOTE: arm_controller reads these from arm.servo_channels.*
+  servo_channels:
+    shoulder: 0
+    elbow: 1
+    gripper: 2
+
+  # Angle limits per servo
+  # NOTE: arm_controller reads these from arm.angle_limits.*
+  angle_limits:
+    shoulder:
+      min: 0       # 0° = arm hanging straight down (rest)
+      max: 180     # 180° = full range (90° left = 500µs, 90° right = 2500µs)
+      home: 0      # Start with arm pointing down
+
+    elbow:
+      min: 0       # 0° = center/forward (1000µs)
+      max: 100     # 100° = full operating stroke (2000µs), matches spec sheet
+      home: 0      # Start at center
+
+    gripper:
+      min: 0       # 0° = open (500µs)
+      max: 90      # 90° = closed
+      home: 0      # Start open
+
+  # Per-servo pulse width calibration
+  # Shoulder: Hwünder LD-60MG (or equivalent 180° servo)
+  #   Mounted HORIZONTALLY. Arm hangs vertically at rest.
+  #   500µs  = 90° left  (logical 0°  if you want left as min)
+  #   1500µs = center     (logical 90° = arm pointing straight down = home)
+  #   2500µs = 90° right  (logical 180°)
+  #   We map logical 0°=500µs ... 180°=2500µs across the full range.
+  #   Set home_angle=90 so home() positions arm straight down.
+  pwm_limits:
+    min_pulse: 500
+    max_pulse: 2500
+
   shoulder:
-    min_pulse: 500     # Microseconds for 90° UP
-    max_pulse: 1500    # Microseconds for 0° (horizontal REST)
-    min_angle: 0       # Logical 0° = horizontal (rest)
-    max_angle: 90      # Logical 90° = vertical (up)
-    home_angle: 0      # Starting position (horizontal)
-  
-  # Elbow servo configuration  
-  # Model: Standard position servo with 100° operating stroke
-  # Specs: 1000μs = 0°, 2000μs = 100° (1500μs = neutral/50°)
-  # Full range: 800-2200μs for ~130°
+    min_pulse: 500     # 500µs  = logical 0°  (arm swung fully one way)
+    max_pulse: 2500    # 2500µs = logical 180° (arm swung fully other way)
+    # home is 90° logical = 1500µs = arm hanging straight down
+    # (arm_controller will read home from angle_limits.shoulder.home,
+    #  but we override home_angle in ArmController constructor — see note)
+
+  # Elbow: LD-60MG or similar
+  #   Operating stroke: 100° (1000µs → 2000µs), neutral at 1500µs
+  #   Full range (max stroke): ~130° (900µs → 2100µs)
+  #   We use the operating stroke only: 1000→2000µs = 0°→100°
   elbow:
-    min_pulse: 1000    # Microseconds for 0° (center)
-    max_pulse: 2000    # Microseconds for 100° (left)
-    min_angle: 0       # Degrees (center/forward)
-    max_angle: 90      # Degrees (max left rotation)
-    home_angle: 0      # Starting position
-  
-  # Gripper servo configuration
-  # Model: Standard position servo
-  # Specs: 500μs = 0°, 2500μs = 180°
+    min_pulse: 1000    # 1000µs = 0° (center/forward)
+    max_pulse: 2000    # 2000µs = 100° (full operating stroke)
+
+  # Gripper: standard 180° servo (500–2500µs)
   gripper:
-    min_pulse: 500     # Microseconds for 0° (open)
-    max_pulse: 2500    # Microseconds for 180° (closed)
-    min_angle: 0       # Degrees (open)
-    max_angle: 90      # Degrees (closed)
-    home_angle: 0      # Starting position (open)
+    min_pulse: 500     # 500µs  = 0°  (open)
+    max_pulse: 2500    # 2500µs = 180° (but we only use up to 90° = closed)
+
   # Movement settings
   movement:
     default_speed: 50     # degrees/second
@@ -156,20 +176,18 @@ sensors:
     min_range: 0.02
   
   tof:
-    enabled: true              # ← Enable it
-    update_rate: 20            # Hz
-    sensor_type: "VL53L1X"     # Sensor model
-    i2c_address: 0x29          # Default VL53L1X address
+    enabled: true
+    update_rate: 20
+    sensor_type: "VL53L1X"
+    i2c_address: 0x29
   
-    # Scanning configuration
     scan_enabled: true
-    scan_servo_channel: 3      # Extra servo for scanning
-    scan_range: [-90, 90]      # Degrees
-    scan_step: 10              # Degrees per reading
+    scan_servo_channel: 3
+    scan_range: [-90, 90]
+    scan_step: 10
   
-    # Detection thresholds
-    min_distance: 0.1          # Meters (ignore closer)
-    max_distance: 2.0          # Meters (ignore farther)
+    min_distance: 0.1
+    max_distance: 2.0
   
   limit_switches:
     enabled: true
